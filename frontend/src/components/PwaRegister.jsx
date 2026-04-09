@@ -14,9 +14,54 @@ export default function PwaRegister() {
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    let reloadTriggered = false;
+    let updateTimerId;
+
+    function activateWaitingWorker(registration) {
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
+    }
+
+    function handleControllerChange() {
+      if (reloadTriggered) {
+        return;
+      }
+
+      reloadTriggered = true;
+      window.location.reload();
+    }
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => null);
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .then((registration) => {
+          activateWaitingWorker(registration);
+
+          registration.addEventListener("updatefound", () => {
+            const installingWorker = registration.installing;
+
+            if (!installingWorker) {
+              return;
+            }
+
+            installingWorker.addEventListener("statechange", () => {
+              if (
+                installingWorker.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
+                activateWaitingWorker(registration);
+              }
+            });
+          });
+
+          updateTimerId = window.setInterval(() => {
+            registration.update().catch(() => null);
+          }, 60 * 1000);
+        })
+        .catch(() => null);
+
+      navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
     }
 
     function handleModeChange(event) {
@@ -28,12 +73,27 @@ export default function PwaRegister() {
       setPromptEvent(event);
     }
 
+    function handleInstalled() {
+      setIsStandalone(true);
+      setPromptEvent(null);
+    }
+
     mediaQuery.addEventListener("change", handleModeChange);
     window.addEventListener("beforeinstallprompt", handlePrompt);
+    window.addEventListener("appinstalled", handleInstalled);
 
     return () => {
+      if (updateTimerId) {
+        window.clearInterval(updateTimerId);
+      }
+
       mediaQuery.removeEventListener("change", handleModeChange);
       window.removeEventListener("beforeinstallprompt", handlePrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
+      navigator.serviceWorker?.removeEventListener(
+        "controllerchange",
+        handleControllerChange,
+      );
     };
   }, []);
 

@@ -1,19 +1,26 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 const mysql = require("mysql2/promise");
 
 dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT || 5000);
+const defaultDbUser = process.env.DB_USER || "root";
+const defaultDbPassword = process.env.DB_PASSWORD || "";
+const jwtSecret = process.env.JWT_SECRET || "discipline-tracker-dev-secret";
+const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "12h";
 
 const dbConfig = {
   host: process.env.DB_HOST || "127.0.0.1",
   port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "root",
+  user: defaultDbUser,
+  password: defaultDbPassword,
   database: process.env.DB_NAME || "expense_tracker",
+  socketPath: process.env.DB_SOCKET_PATH || undefined,
   dateStrings: true,
   ssl:
     process.env.DB_SSL === "true"
@@ -27,6 +34,104 @@ const asyncHandler = (handler) => (req, res, next) =>
   Promise.resolve(handler(req, res, next)).catch(next);
 
 let pool;
+
+function formatDatabaseHelp(error) {
+  const lines = [
+    "MySQL connection failed.",
+    `Tried user '${dbConfig.user}' against database '${dbConfig.database}'.`,
+  ];
+
+  if (dbConfig.socketPath) {
+    lines.push(`Connection mode: socket (${dbConfig.socketPath})`);
+  } else {
+    lines.push(`Connection mode: TCP (${dbConfig.host}:${dbConfig.port})`);
+  }
+
+  if (error?.code === "ER_ACCESS_DENIED_ERROR") {
+    lines.push("The username or password was rejected by MySQL.");
+  }
+
+  lines.push("Create backend/.env with your real MySQL credentials, for example:");
+  lines.push("DB_HOST=127.0.0.1");
+  lines.push("DB_PORT=3306");
+  lines.push("DB_USER=root");
+  lines.push("DB_PASSWORD=your_real_mysql_password");
+  lines.push("DB_NAME=expense_tracker");
+  lines.push("Optional for socket auth:");
+  lines.push("DB_SOCKET_PATH=/var/run/mysqld/mysqld.sock");
+
+  return lines.join("\n");
+}
+
+function createAuthToken(user) {
+  const sessionId = crypto.randomUUID();
+
+  return {
+    sessionId,
+    token: jwt.sign(
+      {
+        sub: String(user.id),
+        username: user.username,
+        name: user.name,
+        sid: sessionId,
+      },
+      jwtSecret,
+      { expiresIn: jwtExpiresIn },
+    ),
+  };
+}
+
+async function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization || "";
+
+  if (!authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
+
+  try {
+    const payload = jwt.verify(token, jwtSecret);
+    const [rows] = await pool.query(
+      `SELECT id, username, name, session_token_id AS sessionTokenId
+       FROM users
+       WHERE id = ?
+       LIMIT 1`,
+      [payload.sub],
+    );
+
+    const user = rows[0];
+
+    if (!user || !user.sessionTokenId || user.sessionTokenId !== payload.sid) {
+      return res.status(401).json({
+        message: "Your session expired because you logged in on another device.",
+      });
+    }
+
+    req.auth = {
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+      },
+      tokenId: payload.sid,
+    };
+
+    return next();
+  } catch (_error) {
+    return res.status(401).json({ message: "Invalid or expired session token" });
+  }
+}
+
+async function ensureUserSessionColumn() {
+  const [rows] = await pool.query("SHOW COLUMNS FROM users LIKE 'session_token_id'");
+
+  if (!rows.length) {
+    await pool.query(
+      "ALTER TABLE users ADD COLUMN session_token_id VARCHAR(64) DEFAULT NULL",
+    );
+  }
+}
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -84,10 +189,13 @@ async function initDatabase() {
       username VARCHAR(80) NOT NULL UNIQUE,
       password VARCHAR(255) NOT NULL,
       name VARCHAR(120) NOT NULL DEFAULT 'Subrat',
+      session_token_id VARCHAR(64) DEFAULT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  await ensureUserSessionColumn();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -174,14 +282,39 @@ app.post("/api/auth/login", asyncHandler(async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
+  const { sessionId, token } = createAuthToken(user);
+
+  await pool.query(
+    "UPDATE users SET session_token_id = ? WHERE id = ?",
+    [sessionId, user.id],
+  );
+
   return res.json({
-    id: user.id,
-    username: user.username,
-    name: user.name,
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+    },
   });
 }));
 
-app.get("/api/auth/users", asyncHandler(async (_req, res) => {
+app.get("/api/auth/session", requireAuth, asyncHandler(async (req, res) => {
+  res.json({
+    user: req.auth.user,
+  });
+}));
+
+app.post("/api/auth/logout", requireAuth, asyncHandler(async (req, res) => {
+  await pool.query(
+    "UPDATE users SET session_token_id = NULL WHERE id = ?",
+    [req.auth.user.id],
+  );
+
+  res.json({ ok: true });
+}));
+
+app.get("/api/auth/users", requireAuth, asyncHandler(async (_req, res) => {
   const [rows] = await pool.query(
     "SELECT id, username, name, created_at FROM users ORDER BY id ASC",
   );
@@ -198,6 +331,19 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
     database: dbConfig.database,
   });
 }));
+
+app.use("/api", (req, res, next) => {
+  if (
+    req.path === "/auth/login" ||
+    req.path === "/auth/session" ||
+    req.path === "/auth/logout" ||
+    req.path === "/health"
+  ) {
+    return next();
+  }
+
+  return requireAuth(req, res, next);
+});
 
 app.get("/api/settings", asyncHandler(async (_req, res) => {
   res.json(await getSettings());
@@ -418,6 +564,7 @@ initDatabase()
     });
   })
   .catch((error) => {
-    console.error("Failed to connect to MySQL:", error.message);
+    console.error(formatDatabaseHelp(error));
+    console.error(`Original MySQL error: ${error.message}`);
     process.exit(1);
   });

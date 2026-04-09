@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import PwaRegister from "./PwaRegister";
 
-const LOGIN_KEY = "discipline_tracker_logged_in";
+const TOKEN_KEY = "discipline_tracker_token";
+const USER_KEY = "discipline_tracker_user";
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
@@ -88,12 +89,24 @@ function getGreeting(date = new Date()) {
   return "Good evening";
 }
 
-async function fetchJson(path, options) {
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
+async function fetchJson(path, options = {}, authToken) {
+  const headers = new Headers(options.headers || {});
+
+  if (authToken) {
+    headers.set("Authorization", `Bearer ${authToken}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.message || `Request failed: ${response.status}`);
+    const error = new Error(payload.message || `Request failed: ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();
@@ -128,7 +141,6 @@ function TabButton({ label, tab, activeTab, onPress, icon }) {
 function LoginScreen({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -144,7 +156,7 @@ function LoginScreen({ onLogin }) {
     setError("");
 
     try {
-      const user = await fetchJson("/api/auth/login", {
+      const session = await fetchJson("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -152,7 +164,7 @@ function LoginScreen({ onLogin }) {
         body: JSON.stringify({ username, password }),
       });
 
-      onLogin({ remember, user });
+      onLogin(session);
     } catch (authError) {
       setError(authError.message || "Invalid credentials");
     } finally {
@@ -207,15 +219,6 @@ function LoginScreen({ onLogin }) {
             </div>
           </div>
 
-          <label className="remember-row">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={() => setRemember((value) => !value)}
-            />
-            <span>Remember me</span>
-          </label>
-
           {error ? (
             <p className="form-error" role="alert">
               {error}
@@ -226,7 +229,9 @@ function LoginScreen({ onLogin }) {
             {isSubmitting ? "Checking..." : "Login"}
           </button>
 
-          <p className="credentials-hint">Backend login: admin / 1234</p>
+          <p className="credentials-hint">
+            Backend login: admin / 1234. Session ends when you close the app.
+          </p>
         </form>
 
         <footer className="login-footer">Stay disciplined daily</footer>
@@ -659,7 +664,8 @@ function ProfileTab({ statsSummary, gymLogMap, onLogout, gymSummary }) {
 
 export default function AppShell() {
   const [booted, setBooted] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [authToken, setAuthToken] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState("home");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -714,12 +720,12 @@ export default function AppShell() {
         gymLogsPayload,
         gymSummaryPayload,
       ] = await Promise.all([
-        fetchJson("/api/dashboard/today"),
-        fetchJson("/api/stats/summary"),
-        fetchJson("/api/stats/weekly"),
-        fetchJson("/api/stats/monthly"),
-        fetchJson("/api/gym"),
-        fetchJson("/api/gym/summary"),
+        fetchJson("/api/dashboard/today", {}, authToken),
+        fetchJson("/api/stats/summary", {}, authToken),
+        fetchJson("/api/stats/weekly", {}, authToken),
+        fetchJson("/api/stats/monthly", {}, authToken),
+        fetchJson("/api/gym", {}, authToken),
+        fetchJson("/api/gym/summary", {}, authToken),
       ]);
 
       setDashboard(dashboardPayload);
@@ -729,6 +735,11 @@ export default function AppShell() {
       setGymLogs(gymLogsPayload);
       setGymSummary(gymSummaryPayload);
     } catch (error) {
+      if (error.status === 401) {
+        handleSessionExpired(error.message);
+        return;
+      }
+
       setErrorMessage(error.message || "Failed to load live data from backend.");
     } finally {
       setIsSyncing(false);
@@ -736,20 +747,37 @@ export default function AppShell() {
   }
 
   useEffect(() => {
-    const savedLogin = window.localStorage.getItem(LOGIN_KEY) === "true";
-    const timer = window.setTimeout(() => {
-      setLoggedIn(savedLogin);
-      setBooted(true);
-    }, 0);
+    const savedToken = window.sessionStorage.getItem(TOKEN_KEY);
+    const savedUser = window.sessionStorage.getItem(USER_KEY);
 
-    return () => window.clearTimeout(timer);
+    if (!savedToken) {
+      setBooted(true);
+      return undefined;
+    }
+
+    fetchJson("/api/auth/session", {}, savedToken)
+      .then((payload) => {
+        setAuthToken(savedToken);
+        setCurrentUser(
+          payload.user || (savedUser ? JSON.parse(savedUser) : null),
+        );
+      })
+      .catch(() => {
+        window.sessionStorage.removeItem(TOKEN_KEY);
+        window.sessionStorage.removeItem(USER_KEY);
+      })
+      .finally(() => {
+        setBooted(true);
+      });
+
+    return undefined;
   }, []);
 
   useEffect(() => {
-    if (booted && loggedIn) {
+    if (booted && authToken) {
       loadAppData();
     }
-  }, [booted, loggedIn]);
+  }, [booted, authToken]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -761,16 +789,40 @@ export default function AppShell() {
 
   const greeting = getGreeting(now);
   const displayDate = formatDisplayDate(now);
+  const loggedIn = Boolean(authToken);
 
-  function handleLogin() {
-    window.localStorage.setItem(LOGIN_KEY, "true");
-    setLoggedIn(true);
+  function handleLogin(session) {
+    window.sessionStorage.setItem(TOKEN_KEY, session.token);
+    window.sessionStorage.setItem(USER_KEY, JSON.stringify(session.user));
+    setAuthToken(session.token);
+    setCurrentUser(session.user);
+    setErrorMessage("");
     setActiveTab("home");
   }
 
-  function handleLogout() {
-    window.localStorage.removeItem(LOGIN_KEY);
-    setLoggedIn(false);
+  function clearSession(message = "") {
+    window.sessionStorage.removeItem(TOKEN_KEY);
+    window.sessionStorage.removeItem(USER_KEY);
+    setAuthToken("");
+    setCurrentUser(null);
+    setActiveTab("home");
+    setErrorMessage(message);
+  }
+
+  function handleSessionExpired(message) {
+    clearSession(message || "Your session expired. Please log in again.");
+  }
+
+  async function handleLogout() {
+    try {
+      if (authToken) {
+        await fetchJson("/api/auth/logout", { method: "POST" }, authToken);
+      }
+    } catch (_error) {
+      // Ignore logout API failures and clear the local session anyway.
+    } finally {
+      clearSession("");
+    }
   }
 
   async function addExpense(event) {
@@ -798,12 +850,17 @@ export default function AppShell() {
           category: "general",
           date: getTodayKey(),
         }),
-      });
+      }, authToken);
 
       setAmount("");
       setNote("");
       await loadAppData();
     } catch (error) {
+      if (error.status === 401) {
+        handleSessionExpired(error.message);
+        return;
+      }
+
       setErrorMessage(error.message || "Failed to save expense.");
       setIsSyncing(false);
     }
@@ -825,10 +882,15 @@ export default function AppShell() {
           sessionLabel: "6-7 AM Gym",
           notes: "",
         }),
-      });
+      }, authToken);
 
       await loadAppData();
     } catch (error) {
+      if (error.status === 401) {
+        handleSessionExpired(error.message);
+        return;
+      }
+
       setErrorMessage(error.message || "Failed to update gym log.");
       setIsSyncing(false);
     }
@@ -861,7 +923,7 @@ export default function AppShell() {
             <span className="section-label">Daily Discipline</span>
             <h1>
               {greeting}, <br />
-              Subrat
+              {currentUser?.name || "Subrat"}
             </h1>
             <div className="topbar-date-card" aria-label={`Today is ${displayDate}`}>
               <span className="topbar-date-tag">Today</span>
