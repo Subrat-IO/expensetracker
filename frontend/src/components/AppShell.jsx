@@ -6,7 +6,8 @@ import PwaRegister from "./PwaRegister";
 const TOKEN_KEY = "discipline_tracker_token";
 const USER_KEY = "discipline_tracker_user";
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "https://expensetracker-zwgt.onrender.com";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
