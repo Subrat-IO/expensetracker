@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PwaRegister from "./PwaRegister";
 
 const TOKEN_KEY = "discipline_tracker_token";
@@ -707,7 +707,16 @@ export default function AppShell() {
     [gymLogs],
   );
 
-  async function loadAppData() {
+  const handleSessionExpired = useCallback((message) => {
+    window.sessionStorage.removeItem(TOKEN_KEY);
+    window.sessionStorage.removeItem(USER_KEY);
+    setAuthToken("");
+    setCurrentUser(null);
+    setActiveTab("home");
+    setErrorMessage(message || "Your session expired. Please log in again.");
+  }, []);
+
+  const loadAppData = useCallback(async () => {
     setIsSyncing(true);
     setErrorMessage("");
 
@@ -744,7 +753,7 @@ export default function AppShell() {
     } finally {
       setIsSyncing(false);
     }
-  }
+  }, [authToken, handleSessionExpired]);
 
   useEffect(() => {
     const savedToken = window.sessionStorage.getItem(TOKEN_KEY);
@@ -777,7 +786,7 @@ export default function AppShell() {
     if (booted && authToken) {
       loadAppData();
     }
-  }, [booted, authToken]);
+  }, [booted, authToken, loadAppData]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -807,10 +816,6 @@ export default function AppShell() {
     setCurrentUser(null);
     setActiveTab("home");
     setErrorMessage(message);
-  }
-
-  function handleSessionExpired(message) {
-    clearSession(message || "Your session expired. Please log in again.");
   }
 
   async function handleLogout() {

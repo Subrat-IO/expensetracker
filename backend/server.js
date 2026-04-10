@@ -3,62 +3,60 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const mysql = require("mysql2/promise");
+const { MongoClient, ObjectId } = require("mongodb");
 
 dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT || 5000);
-const defaultDbUser = process.env.DB_USER || "root";
-const defaultDbPassword = process.env.DB_PASSWORD || "";
 const jwtSecret = process.env.JWT_SECRET || "discipline-tracker-dev-secret";
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "12h";
+const mongoUri =
+  process.env.MONGODB_URI ||
+  process.env.DATABASE_URL ||
+  "mongodb://127.0.0.1:27017/expense_tracker";
+const databaseName =
+  process.env.MONGODB_DB_NAME ||
+  (() => {
+    try {
+      const parsed = new URL(mongoUri);
+      return parsed.pathname.replace(/^\//, "") || "expense_tracker";
+    } catch (_error) {
+      return "expense_tracker";
+    }
+  })();
 
-const dbConfig = {
-  host: process.env.DB_HOST || "127.0.0.1",
-  port: Number(process.env.DB_PORT || 3306),
-  user: defaultDbUser,
-  password: defaultDbPassword,
-  database: process.env.DB_NAME || "expense_tracker",
-  socketPath: process.env.DB_SOCKET_PATH || undefined,
-  dateStrings: true,
-  ssl:
-    process.env.DB_SSL === "true"
-      ? {
-          rejectUnauthorized: false,
-        }
-      : undefined,
-};
+if (
+  process.env.NODE_ENV === "production" &&
+  jwtSecret === "discipline-tracker-dev-secret"
+) {
+  throw new Error("JWT_SECRET must be set in production.");
+}
+
+const SETTINGS_ID = "app_settings";
 
 const asyncHandler = (handler) => (req, res, next) =>
   Promise.resolve(handler(req, res, next)).catch(next);
 
-let pool;
+let client;
+let db;
+let usersCollection;
+let settingsCollection;
+let expensesCollection;
+let gymLogsCollection;
 
 function formatDatabaseHelp(error) {
   const lines = [
-    "MySQL connection failed.",
-    `Tried user '${dbConfig.user}' against database '${dbConfig.database}'.`,
+    "MongoDB connection failed.",
+    `Target database: '${databaseName}'.`,
+    "Create backend/.env with your real MongoDB connection string, for example:",
+    "MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/expense_tracker?retryWrites=true&w=majority",
+    "MONGODB_DB_NAME=expense_tracker",
   ];
 
-  if (dbConfig.socketPath) {
-    lines.push(`Connection mode: socket (${dbConfig.socketPath})`);
-  } else {
-    lines.push(`Connection mode: TCP (${dbConfig.host}:${dbConfig.port})`);
+  if (error?.code === 18) {
+    lines.push("The username or password was rejected by MongoDB Atlas.");
   }
-
-  if (error?.code === "ER_ACCESS_DENIED_ERROR") {
-    lines.push("The username or password was rejected by MySQL.");
-  }
-
-  lines.push("Create backend/.env with your real MySQL credentials, for example:");
-  lines.push("DB_HOST=127.0.0.1");
-  lines.push("DB_PORT=3306");
-  lines.push("DB_USER=root");
-  lines.push("DB_PASSWORD=your_real_mysql_password");
-  lines.push("DB_NAME=expense_tracker");
-  lines.push("Optional for socket auth:");
-  lines.push("DB_SOCKET_PATH=/var/run/mysqld/mysqld.sock");
 
   return lines.join("\n");
 }
@@ -70,7 +68,7 @@ function createAuthToken(user) {
     sessionId,
     token: jwt.sign(
       {
-        sub: String(user.id),
+        sub: String(user._id),
         username: user.username,
         name: user.name,
         sid: sessionId,
@@ -92,15 +90,15 @@ async function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, jwtSecret);
-    const [rows] = await pool.query(
-      `SELECT id, username, name, session_token_id AS sessionTokenId
-       FROM users
-       WHERE id = ?
-       LIMIT 1`,
-      [payload.sub],
-    );
 
-    const user = rows[0];
+    if (!ObjectId.isValid(payload.sub)) {
+      return res.status(401).json({ message: "Invalid or expired session token" });
+    }
+
+    const user = await usersCollection.findOne(
+      { _id: new ObjectId(payload.sub) },
+      { projection: { username: 1, name: 1, sessionTokenId: 1 } },
+    );
 
     if (!user || !user.sessionTokenId || user.sessionTokenId !== payload.sid) {
       return res.status(401).json({
@@ -110,7 +108,7 @@ async function requireAuth(req, res, next) {
 
     req.auth = {
       user: {
-        id: user.id,
+        id: String(user._id),
         username: user.username,
         name: user.name,
       },
@@ -120,16 +118,6 @@ async function requireAuth(req, res, next) {
     return next();
   } catch (_error) {
     return res.status(401).json({ message: "Invalid or expired session token" });
-  }
-}
-
-async function ensureUserSessionColumn() {
-  const [rows] = await pool.query("SHOW COLUMNS FROM users LIKE 'session_token_id'");
-
-  if (!rows.length) {
-    await pool.query(
-      "ALTER TABLE users ADD COLUMN session_token_id VARCHAR(64) DEFAULT NULL",
-    );
   }
 }
 
@@ -164,100 +152,85 @@ function normalizeDateValue(value) {
   return new Date(value).toISOString().slice(0, 10);
 }
 
+function mapExpense(doc) {
+  return {
+    id: String(doc._id),
+    amount: toNumber(doc.amount),
+    note: doc.note || "",
+    category: doc.category || "general",
+    date: normalizeDateValue(doc.date),
+    createdAt: doc.createdAt,
+  };
+}
+
+function mapGymLog(doc) {
+  return {
+    id: String(doc._id),
+    date: normalizeDateValue(doc.date),
+    completed: Boolean(doc.completed),
+    sessionLabel: doc.sessionLabel || "6-7 AM Gym",
+    notes: doc.notes || "",
+    createdAt: doc.createdAt,
+  };
+}
+
+async function ensureDefaultData() {
+  await settingsCollection.updateOne(
+    { _id: SETTINGS_ID },
+    {
+      $setOnInsert: {
+        dailyBudget: 120,
+        currencyCode: "INR",
+        createdAt: new Date(),
+      },
+      $set: {
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true },
+  );
+
+  await usersCollection.updateOne(
+    { username: "admin" },
+    {
+      $set: {
+        password: "1234",
+        name: "Subrat",
+        updatedAt: new Date(),
+      },
+      $setOnInsert: {
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true },
+  );
+}
+
 async function initDatabase() {
-  const bootstrap = await mysql.createConnection({
-    host: dbConfig.host,
-    port: dbConfig.port,
-    user: dbConfig.user,
-    password: dbConfig.password,
-    multipleStatements: true,
+  client = new MongoClient(mongoUri, {
+    serverSelectionTimeoutMS: 15000,
   });
 
-  await bootstrap.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\``);
-  await bootstrap.end();
+  await client.connect();
+  db = client.db(databaseName);
+  usersCollection = db.collection("users");
+  settingsCollection = db.collection("settings");
+  expensesCollection = db.collection("expenses");
+  gymLogsCollection = db.collection("gym_logs");
 
-  pool = mysql.createPool({
-    ...dbConfig,
-    waitForConnections: true,
-    connectionLimit: 10,
-    namedPlaceholders: false,
-  });
+  await usersCollection.createIndex({ username: 1 }, { unique: true });
+  await expensesCollection.createIndex({ date: 1, createdAt: -1 });
+  await gymLogsCollection.createIndex({ date: 1 }, { unique: true });
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      username VARCHAR(80) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
-      name VARCHAR(120) NOT NULL DEFAULT 'Subrat',
-      session_token_id VARCHAR(64) DEFAULT NULL,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
-
-  await ensureUserSessionColumn();
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS settings (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      daily_budget DECIMAL(10, 2) NOT NULL DEFAULT 120,
-      currency_code VARCHAR(10) NOT NULL DEFAULT 'INR',
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS expenses (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      amount DECIMAL(10, 2) NOT NULL,
-      note VARCHAR(255) DEFAULT '',
-      category VARCHAR(60) NOT NULL DEFAULT 'general',
-      date DATE NOT NULL,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_expenses_date (date),
-      INDEX idx_expenses_created_at (created_at)
-    )
-  `);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS gym_logs (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      date DATE NOT NULL UNIQUE,
-      completed TINYINT(1) NOT NULL DEFAULT 0,
-      session_label VARCHAR(80) NOT NULL DEFAULT '6-7 AM Gym',
-      notes VARCHAR(255) DEFAULT '',
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_gym_logs_date (date)
-    )
-  `);
-
-  await pool.query(`
-    INSERT INTO settings (id, daily_budget, currency_code)
-    VALUES (1, 120, 'INR')
-    ON DUPLICATE KEY UPDATE
-      daily_budget = VALUES(daily_budget),
-      currency_code = VALUES(currency_code)
-  `);
-
-  await pool.query(`
-    INSERT INTO users (username, password, name)
-    VALUES ('admin', '1234', 'Subrat')
-    ON DUPLICATE KEY UPDATE
-      password = VALUES(password),
-      name = VALUES(name)
-  `);
+  await ensureDefaultData();
 }
 
 async function getSettings() {
-  const [rows] = await pool.query(
-    "SELECT daily_budget, currency_code FROM settings WHERE id = 1 LIMIT 1",
-  );
+  const settings = await settingsCollection.findOne({ _id: SETTINGS_ID });
 
   return {
-    dailyBudget: toNumber(rows[0]?.daily_budget || 120),
-    currencyCode: rows[0]?.currency_code || "INR",
+    dailyBudget: toNumber(settings?.dailyBudget || 120),
+    currencyCode: settings?.currencyCode || "INR",
   };
 }
 
@@ -271,12 +244,10 @@ app.post("/api/auth/login", asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "username and password are required" });
   }
 
-  const [rows] = await pool.query(
-    "SELECT id, username, password, name FROM users WHERE username = ? LIMIT 1",
-    [username],
+  const user = await usersCollection.findOne(
+    { username },
+    { projection: { username: 1, password: 1, name: 1 } },
   );
-
-  const user = rows[0];
 
   if (!user || user.password !== password) {
     return res.status(401).json({ message: "Invalid credentials" });
@@ -284,15 +255,15 @@ app.post("/api/auth/login", asyncHandler(async (req, res) => {
 
   const { sessionId, token } = createAuthToken(user);
 
-  await pool.query(
-    "UPDATE users SET session_token_id = ? WHERE id = ?",
-    [sessionId, user.id],
+  await usersCollection.updateOne(
+    { _id: user._id },
+    { $set: { sessionTokenId: sessionId, updatedAt: new Date() } },
   );
 
   return res.json({
     token,
     user: {
-      id: user.id,
+      id: String(user._id),
       username: user.username,
       name: user.name,
     },
@@ -306,29 +277,35 @@ app.get("/api/auth/session", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.post("/api/auth/logout", requireAuth, asyncHandler(async (req, res) => {
-  await pool.query(
-    "UPDATE users SET session_token_id = NULL WHERE id = ?",
-    [req.auth.user.id],
+  await usersCollection.updateOne(
+    { _id: new ObjectId(req.auth.user.id) },
+    { $set: { sessionTokenId: null, updatedAt: new Date() } },
   );
 
   res.json({ ok: true });
 }));
 
 app.get("/api/auth/users", requireAuth, asyncHandler(async (_req, res) => {
-  const [rows] = await pool.query(
-    "SELECT id, username, name, created_at FROM users ORDER BY id ASC",
-  );
+  const users = await usersCollection
+    .find({}, { projection: { username: 1, name: 1, createdAt: 1 } })
+    .sort({ createdAt: 1, _id: 1 })
+    .toArray();
 
-  res.json(rows);
+  res.json(users.map((user) => ({
+    id: String(user._id),
+    username: user.username,
+    name: user.name,
+    created_at: user.createdAt,
+  })));
 }));
 
 app.get("/api/health", asyncHandler(async (_req, res) => {
-  await pool.query("SELECT 1");
+  await db.command({ ping: 1 });
 
   res.json({
     ok: true,
-    message: "MySQL connected",
-    database: dbConfig.database,
+    message: "MongoDB connected",
+    database: databaseName,
   });
 }));
 
@@ -353,13 +330,19 @@ app.put("/api/settings", asyncHandler(async (req, res) => {
   const dailyBudget = toNumber(req.body.dailyBudget || 120);
   const currencyCode = req.body.currencyCode || "INR";
 
-  await pool.query(
-    `INSERT INTO settings (id, daily_budget, currency_code)
-     VALUES (1, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       daily_budget = VALUES(daily_budget),
-       currency_code = VALUES(currency_code)`,
-    [dailyBudget, currencyCode],
+  await settingsCollection.updateOne(
+    { _id: SETTINGS_ID },
+    {
+      $set: {
+        dailyBudget,
+        currencyCode,
+        updatedAt: new Date(),
+      },
+      $setOnInsert: {
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true },
   );
 
   res.json({ dailyBudget, currencyCode });
@@ -375,13 +358,17 @@ app.post("/api/expenses", asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "amount and date are required" });
   }
 
-  const [result] = await pool.query(
-    "INSERT INTO expenses (amount, note, category, date) VALUES (?, ?, ?, ?)",
-    [amount, note, category, date],
-  );
+  const result = await expensesCollection.insertOne({
+    amount,
+    note,
+    category,
+    date,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
 
   res.status(201).json({
-    id: result.insertId,
+    id: String(result.insertedId),
     amount,
     note,
     category,
@@ -391,53 +378,44 @@ app.post("/api/expenses", asyncHandler(async (req, res) => {
 
 app.get("/api/expenses/daily", asyncHandler(async (req, res) => {
   const date = req.query.date || todayDate();
-  const [rows] = await pool.query(
-    `SELECT id, amount, note, category, date, created_at AS createdAt
-     FROM expenses
-     WHERE date = ?
-     ORDER BY created_at DESC`,
-    [date],
-  );
+  const expenses = await expensesCollection
+    .find({ date })
+    .sort({ createdAt: -1, _id: -1 })
+    .toArray();
 
-  res.json(rows);
+  res.json(expenses.map(mapExpense));
 }));
 
 app.get("/api/dashboard/today", asyncHandler(async (_req, res) => {
   const date = todayDate();
   const settings = await getSettings();
-  const [rows] = await pool.query(
-    `SELECT id, amount, note, category, date, created_at AS createdAt
-     FROM expenses
-     WHERE date = ?
-     ORDER BY created_at DESC`,
-    [date],
-  );
-  const spent = rows.reduce((sum, row) => sum + toNumber(row.amount), 0);
+  const expenses = await expensesCollection
+    .find({ date })
+    .sort({ createdAt: -1, _id: -1 })
+    .toArray();
+  const normalizedExpenses = expenses.map(mapExpense);
+  const spent = normalizedExpenses.reduce((sum, row) => sum + toNumber(row.amount), 0);
 
   res.json({
     date,
     ...settings,
     spent,
     remaining: settings.dailyBudget - spent,
-    expenses: rows,
+    expenses: normalizedExpenses,
   });
 }));
 
 app.get("/api/stats/summary", asyncHandler(async (_req, res) => {
   const settings = await getSettings();
+  const weeklyExpenses = await expensesCollection
+    .find({ date: { $gte: startOfWeekDate() } }, { projection: { amount: 1 } })
+    .toArray();
+  const monthlyExpenses = await expensesCollection
+    .find({ date: { $regex: `^${monthPrefix()}` } }, { projection: { amount: 1 } })
+    .toArray();
 
-  const [weeklyRows] = await pool.query(
-    "SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE date >= ?",
-    [startOfWeekDate()],
-  );
-
-  const [monthlyRows] = await pool.query(
-    "SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE DATE_FORMAT(date, '%Y-%m') = ?",
-    [monthPrefix()],
-  );
-
-  const weeklySpent = toNumber(weeklyRows[0]?.total);
-  const monthlySpent = toNumber(monthlyRows[0]?.total);
+  const weeklySpent = weeklyExpenses.reduce((sum, item) => sum + toNumber(item.amount), 0);
+  const monthlySpent = monthlyExpenses.reduce((sum, item) => sum + toNumber(item.amount), 0);
   const weeklyBudget = settings.dailyBudget * 7;
   const monthlyBudget = settings.dailyBudget * new Date().getDate();
 
@@ -453,40 +431,34 @@ app.get("/api/stats/summary", asyncHandler(async (_req, res) => {
 }));
 
 app.get("/api/stats/weekly", asyncHandler(async (_req, res) => {
-  const [rows] = await pool.query(
-    `SELECT date, COALESCE(SUM(amount), 0) AS total
-     FROM expenses
-     WHERE date >= ?
-     GROUP BY date
-     ORDER BY date ASC`,
-    [startOfWeekDate()],
-  );
+  const rows = await expensesCollection.aggregate([
+    { $match: { date: { $gte: startOfWeekDate() } } },
+    { $group: { _id: "$date", total: { $sum: "$amount" } } },
+    { $sort: { _id: 1 } },
+  ]).toArray();
 
   res.json(rows.map((row) => ({
-    date: normalizeDateValue(row.date),
+    date: normalizeDateValue(row._id),
     total: toNumber(row.total),
   })));
 }));
 
 app.get("/api/stats/monthly", asyncHandler(async (_req, res) => {
-  const [rows] = await pool.query(
-    `SELECT date, COALESCE(SUM(amount), 0) AS total
-     FROM expenses
-     WHERE DATE_FORMAT(date, '%Y-%m') = ?
-     GROUP BY date
-     ORDER BY date ASC`,
-    [monthPrefix()],
-  );
+  const rows = await expensesCollection.aggregate([
+    { $match: { date: { $regex: `^${monthPrefix()}` } } },
+    { $group: { _id: "$date", total: { $sum: "$amount" } } },
+    { $sort: { _id: 1 } },
+  ]).toArray();
 
   res.json(rows.map((row) => ({
-    date: normalizeDateValue(row.date),
+    date: normalizeDateValue(row._id),
     total: toNumber(row.total),
   })));
 }));
 
 app.post("/api/gym", asyncHandler(async (req, res) => {
   const date = req.body.date || todayDate();
-  const completed = req.body.completed ? 1 : 0;
+  const completed = Boolean(req.body.completed);
   const sessionLabel = req.body.sessionLabel || "6-7 AM Gym";
   const notes = req.body.notes || "";
 
@@ -494,52 +466,46 @@ app.post("/api/gym", asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "date and completed are required" });
   }
 
-  await pool.query(
-    `INSERT INTO gym_logs (date, completed, session_label, notes)
-     VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       completed = VALUES(completed),
-       session_label = VALUES(session_label),
-       notes = VALUES(notes)`,
-    [date, completed, sessionLabel, notes],
+  await gymLogsCollection.updateOne(
+    { date },
+    {
+      $set: {
+        completed,
+        sessionLabel,
+        notes,
+        updatedAt: new Date(),
+      },
+      $setOnInsert: {
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true },
   );
 
   res.json({
     date,
-    completed: Boolean(completed),
+    completed,
     sessionLabel,
     notes,
   });
 }));
 
 app.get("/api/gym", asyncHandler(async (_req, res) => {
-  const [rows] = await pool.query(
-    `SELECT id, date, completed, session_label AS sessionLabel, notes, created_at AS createdAt
-     FROM gym_logs
-     ORDER BY date DESC`,
-  );
+  const gymLogs = await gymLogsCollection
+    .find({})
+    .sort({ date: -1, _id: -1 })
+    .toArray();
 
-  res.json(rows.map((row) => ({
-    ...row,
-    date: normalizeDateValue(row.date),
-    completed: Boolean(row.completed),
-  })));
+  res.json(gymLogs.map(mapGymLog));
 }));
 
 app.get("/api/gym/summary", asyncHandler(async (_req, res) => {
-  const [rows] = await pool.query(
-    `SELECT date, completed, session_label AS sessionLabel, notes
-     FROM gym_logs
-     WHERE date >= ?
-     ORDER BY date ASC`,
-    [startOfWeekDate()],
-  );
+  const logs = await gymLogsCollection
+    .find({ date: { $gte: startOfWeekDate() } })
+    .sort({ date: 1, _id: 1 })
+    .toArray();
 
-  const normalized = rows.map((row) => ({
-    ...row,
-    date: normalizeDateValue(row.date),
-    completed: Boolean(row.completed),
-  }));
+  const normalized = logs.map(mapGymLog);
   const completedDays = normalized.filter((row) => row.completed).length;
 
   res.json({
@@ -560,11 +526,11 @@ initDatabase()
   .then(() => {
     app.listen(port, () => {
       console.log(`Discipline Tracker API running on port ${port}`);
-      console.log(`MySQL database ready: ${dbConfig.database}`);
+      console.log(`MongoDB database ready: ${databaseName}`);
     });
   })
   .catch((error) => {
     console.error(formatDatabaseHelp(error));
-    console.error(`Original MySQL error: ${error.message}`);
+    console.error(`Original MongoDB error: ${error.message}`);
     process.exit(1);
   });
