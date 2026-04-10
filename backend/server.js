@@ -44,6 +44,9 @@ let usersCollection;
 let settingsCollection;
 let expensesCollection;
 let gymLogsCollection;
+let databaseReady = false;
+let databaseErrorMessage = "Database connection has not been established yet.";
+let isConnectingToDatabase = false;
 
 function formatDatabaseHelp(error) {
   const lines = [
@@ -223,6 +226,8 @@ async function initDatabase() {
   await gymLogsCollection.createIndex({ date: 1 }, { unique: true });
 
   await ensureDefaultData();
+  databaseReady = true;
+  databaseErrorMessage = "";
 }
 
 async function getSettings() {
@@ -234,8 +239,69 @@ async function getSettings() {
   };
 }
 
+function isPublicApiPath(path) {
+  return (
+    path === "/auth/login" ||
+    path === "/auth/session" ||
+    path === "/auth/logout" ||
+    path === "/health"
+  );
+}
+
+function requireDatabaseConnection(req, res, next) {
+  if (databaseReady) {
+    return next();
+  }
+
+  if (req.path === "/health") {
+    return next();
+  }
+
+  return res.status(503).json({
+    ok: false,
+    message: "Backend is starting. Database is not connected yet.",
+    databaseReady,
+    error: databaseErrorMessage,
+  });
+}
+
+async function connectDatabaseWithRetry() {
+  if (databaseReady || isConnectingToDatabase) {
+    return;
+  }
+
+  isConnectingToDatabase = true;
+
+  try {
+    await initDatabase();
+    console.log(`MongoDB database ready: ${databaseName}`);
+  } catch (error) {
+    databaseReady = false;
+    databaseErrorMessage = error.message || "Unknown MongoDB connection error";
+    console.error(formatDatabaseHelp(error));
+    console.error(`Original MongoDB error: ${databaseErrorMessage}`);
+
+    setTimeout(() => {
+      connectDatabaseWithRetry().catch(() => null);
+    }, 10000);
+  } finally {
+    isConnectingToDatabase = false;
+  }
+}
+
 app.use(cors());
 app.use(express.json());
+
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    message: "helloworld",
+    service: "expense-tracker-backend",
+    databaseReady,
+  });
+});
+
+app.use("/api", requireDatabaseConnection);
 
 app.post("/api/auth/login", asyncHandler(async (req, res) => {
   const { username, password } = req.body;
@@ -300,9 +366,18 @@ app.get("/api/auth/users", requireAuth, asyncHandler(async (_req, res) => {
 }));
 
 app.get("/api/health", asyncHandler(async (_req, res) => {
+  if (!databaseReady || !db) {
+    return res.status(503).json({
+      ok: false,
+      message: "MongoDB not connected yet",
+      database: databaseName,
+      error: databaseErrorMessage,
+    });
+  }
+
   await db.command({ ping: 1 });
 
-  res.json({
+  return res.json({
     ok: true,
     message: "MongoDB connected",
     database: databaseName,
@@ -310,12 +385,7 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
 }));
 
 app.use("/api", (req, res, next) => {
-  if (
-    req.path === "/auth/login" ||
-    req.path === "/auth/session" ||
-    req.path === "/auth/logout" ||
-    req.path === "/health"
-  ) {
+  if (isPublicApiPath(req.path)) {
     return next();
   }
 
@@ -522,15 +592,7 @@ app.use((error, _req, res, _next) => {
   });
 });
 
-initDatabase()
-  .then(() => {
-    app.listen(port, () => {
-      console.log(`Discipline Tracker API running on port ${port}`);
-      console.log(`MongoDB database ready: ${databaseName}`);
-    });
-  })
-  .catch((error) => {
-    console.error(formatDatabaseHelp(error));
-    console.error(`Original MongoDB error: ${error.message}`);
-    process.exit(1);
-  });
+app.listen(port, () => {
+  console.log(`Discipline Tracker API running on port ${port}`);
+  connectDatabaseWithRetry().catch(() => null);
+});
