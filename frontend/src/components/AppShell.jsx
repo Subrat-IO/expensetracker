@@ -452,6 +452,13 @@ function normalizeApiDate(v) {
 function getTodayKey() {
   return formatDate(new Date());
 }
+function buildAssetUrl(path) {
+  if (!path) return "/myprofile.png";
+  if (path.startsWith("data:")) return path;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  if (path.startsWith("/")) return `${API_BASE_URL}${path}`;
+  return path;
+}
 function getStartOfWeek(date = new Date()) {
   const c = new Date(date);
   c.setHours(0, 0, 0, 0);
@@ -1512,18 +1519,9 @@ export default function AppShell() {
     if (!currentUser?.id) return;
     const saved = window.localStorage.getItem(`profile_img_${currentUser.id}`);
     if (saved) {
-      setProfileImg(saved);
+      setProfileImg(buildAssetUrl(saved));
     } else {
-      // Try to load the default profile image from the public folder
-      // If it exists at /myprofile.png, use it as a default
-      const img = new Image();
-      img.onload = () => {
-        setProfileImg("/myprofile.png");
-      };
-      img.onerror = () => {
-        setProfileImg(null);
-      };
-      img.src = "/myprofile.png";
+      setProfileImg("/myprofile.png");
     }
   }, [currentUser?.id]);
 
@@ -1753,11 +1751,12 @@ export default function AppShell() {
         if (response.ok) {
           const data = await response.json();
           if (data.imageUrl) {
-            setProfileImg(data.imageUrl);
+            const resolvedImageUrl = buildAssetUrl(data.imageUrl);
+            setProfileImg(resolvedImageUrl);
             if (currentUser?.id) {
               window.localStorage.setItem(
                 `profile_img_${currentUser.id}`,
-                data.imageUrl,
+                resolvedImageUrl,
               );
             }
           }
