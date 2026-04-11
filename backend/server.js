@@ -4,6 +4,9 @@ const dotenv = require("dotenv");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { MongoClient, ObjectId } = require("mongodb");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 dotenv.config();
 
@@ -95,7 +98,9 @@ async function requireAuth(req, res, next) {
     const payload = jwt.verify(token, jwtSecret);
 
     if (!ObjectId.isValid(payload.sub)) {
-      return res.status(401).json({ message: "Invalid or expired session token" });
+      return res
+        .status(401)
+        .json({ message: "Invalid or expired session token" });
     }
 
     const user = await usersCollection.findOne(
@@ -105,7 +110,8 @@ async function requireAuth(req, res, next) {
 
     if (!user || !user.sessionTokenId || user.sessionTokenId !== payload.sid) {
       return res.status(401).json({
-        message: "Your session expired because you logged in on another device.",
+        message:
+          "Your session expired because you logged in on another device.",
       });
     }
 
@@ -120,7 +126,9 @@ async function requireAuth(req, res, next) {
 
     return next();
   } catch (_error) {
-    return res.status(401).json({ message: "Invalid or expired session token" });
+    return res
+      .status(401)
+      .json({ message: "Invalid or expired session token" });
   }
 }
 
@@ -292,6 +300,35 @@ async function connectDatabaseWithRetry() {
 app.use(cors());
 app.use(express.json());
 
+// Setup multer for file uploads
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const name = `${crypto.randomUUID()}${ext}`;
+    cb(null, name);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+});
+
 app.get("/", (_req, res) => {
   res.status(200).json({
     ok: true,
@@ -303,86 +340,137 @@ app.get("/", (_req, res) => {
 
 app.use("/api", requireDatabaseConnection);
 
-app.post("/api/auth/login", asyncHandler(async (req, res) => {
-  const { username, password } = req.body;
+app.post(
+  "/api/auth/login",
+  asyncHandler(async (req, res) => {
+    const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ message: "username and password are required" });
-  }
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ message: "username and password are required" });
+    }
 
-  const user = await usersCollection.findOne(
-    { username },
-    { projection: { username: 1, password: 1, name: 1 } },
-  );
+    const user = await usersCollection.findOne(
+      { username },
+      { projection: { username: 1, password: 1, name: 1 } },
+    );
 
-  if (!user || user.password !== password) {
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
+    if (!user || user.password !== password) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
-  const { sessionId, token } = createAuthToken(user);
+    const { sessionId, token } = createAuthToken(user);
 
-  await usersCollection.updateOne(
-    { _id: user._id },
-    { $set: { sessionTokenId: sessionId, updatedAt: new Date() } },
-  );
+    await usersCollection.updateOne(
+      { _id: user._id },
+      { $set: { sessionTokenId: sessionId, updatedAt: new Date() } },
+    );
 
-  return res.json({
-    token,
-    user: {
-      id: String(user._id),
-      username: user.username,
-      name: user.name,
-    },
-  });
-}));
-
-app.get("/api/auth/session", requireAuth, asyncHandler(async (req, res) => {
-  res.json({
-    user: req.auth.user,
-  });
-}));
-
-app.post("/api/auth/logout", requireAuth, asyncHandler(async (req, res) => {
-  await usersCollection.updateOne(
-    { _id: new ObjectId(req.auth.user.id) },
-    { $set: { sessionTokenId: null, updatedAt: new Date() } },
-  );
-
-  res.json({ ok: true });
-}));
-
-app.get("/api/auth/users", requireAuth, asyncHandler(async (_req, res) => {
-  const users = await usersCollection
-    .find({}, { projection: { username: 1, name: 1, createdAt: 1 } })
-    .sort({ createdAt: 1, _id: 1 })
-    .toArray();
-
-  res.json(users.map((user) => ({
-    id: String(user._id),
-    username: user.username,
-    name: user.name,
-    created_at: user.createdAt,
-  })));
-}));
-
-app.get("/api/health", asyncHandler(async (_req, res) => {
-  if (!databaseReady || !db) {
-    return res.status(503).json({
-      ok: false,
-      message: "MongoDB not connected yet",
-      database: databaseName,
-      error: databaseErrorMessage,
+    return res.json({
+      token,
+      user: {
+        id: String(user._id),
+        username: user.username,
+        name: user.name,
+      },
     });
-  }
+  }),
+);
 
-  await db.command({ ping: 1 });
+app.get(
+  "/api/auth/session",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    res.json({
+      user: req.auth.user,
+    });
+  }),
+);
 
-  return res.json({
-    ok: true,
-    message: "MongoDB connected",
-    database: databaseName,
-  });
-}));
+app.post(
+  "/api/auth/logout",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    await usersCollection.updateOne(
+      { _id: new ObjectId(req.auth.user.id) },
+      { $set: { sessionTokenId: null, updatedAt: new Date() } },
+    );
+
+    res.json({ ok: true });
+  }),
+);
+
+app.get(
+  "/api/auth/users",
+  requireAuth,
+  asyncHandler(async (_req, res) => {
+    const users = await usersCollection
+      .find({}, { projection: { username: 1, name: 1, createdAt: 1 } })
+      .sort({ createdAt: 1, _id: 1 })
+      .toArray();
+
+    res.json(
+      users.map((user) => ({
+        id: String(user._id),
+        username: user.username,
+        name: user.name,
+        created_at: user.createdAt,
+      })),
+    );
+  }),
+);
+
+// Upload profile picture
+app.post(
+  "/api/upload/profile",
+  requireAuth,
+  upload.single("file"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file provided" });
+    }
+
+    const imageUrl = `/uploads/${req.file.filename}`;
+
+    // Optionally store the image path in the user document
+    await usersCollection.updateOne(
+      { _id: new ObjectId(req.auth.user.id) },
+      { $set: { profileImage: imageUrl, updatedAt: new Date() } },
+    );
+
+    res.json({
+      ok: true,
+      imageUrl,
+      message: "Profile picture uploaded successfully",
+    });
+  }),
+);
+
+// Serve uploaded files
+app.use("/uploads", express.static(uploadsDir));
+
+app.get(
+  "/api/health",
+  asyncHandler(async (_req, res) => {
+    if (!databaseReady || !db) {
+      return res.status(503).json({
+        ok: false,
+        message: "MongoDB not connected yet",
+        database: databaseName,
+        error: databaseErrorMessage,
+      });
+    }
+
+    await db.command({ ping: 1 });
+
+    return res.json({
+      ok: true,
+      message: "MongoDB connected",
+      database: databaseName,
+    });
+  }),
+);
 
 app.use("/api", (req, res, next) => {
   if (isPublicApiPath(req.path)) {
@@ -392,203 +480,262 @@ app.use("/api", (req, res, next) => {
   return requireAuth(req, res, next);
 });
 
-app.get("/api/settings", asyncHandler(async (_req, res) => {
-  res.json(await getSettings());
-}));
+app.get(
+  "/api/settings",
+  asyncHandler(async (_req, res) => {
+    res.json(await getSettings());
+  }),
+);
 
-app.put("/api/settings", asyncHandler(async (req, res) => {
-  const dailyBudget = toNumber(req.body.dailyBudget || 120);
-  const currencyCode = req.body.currencyCode || "INR";
+app.put(
+  "/api/settings",
+  asyncHandler(async (req, res) => {
+    const dailyBudget = toNumber(req.body.dailyBudget || 120);
+    const currencyCode = req.body.currencyCode || "INR";
 
-  await settingsCollection.updateOne(
-    { _id: SETTINGS_ID },
-    {
-      $set: {
-        dailyBudget,
-        currencyCode,
-        updatedAt: new Date(),
+    await settingsCollection.updateOne(
+      { _id: SETTINGS_ID },
+      {
+        $set: {
+          dailyBudget,
+          currencyCode,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+        },
       },
-      $setOnInsert: {
-        createdAt: new Date(),
+      { upsert: true },
+    );
+
+    res.json({ dailyBudget, currencyCode });
+  }),
+);
+
+app.post(
+  "/api/expenses",
+  asyncHandler(async (req, res) => {
+    const amount = toNumber(req.body.amount);
+    const date = req.body.date || todayDate();
+    const note = req.body.note || "";
+    const category = req.body.category || "general";
+
+    if (!amount || !date) {
+      return res.status(400).json({ message: "amount and date are required" });
+    }
+
+    const result = await expensesCollection.insertOne({
+      amount,
+      note,
+      category,
+      date,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    res.status(201).json({
+      id: String(result.insertedId),
+      amount,
+      note,
+      category,
+      date,
+    });
+  }),
+);
+
+app.get(
+  "/api/expenses/daily",
+  asyncHandler(async (req, res) => {
+    const date = req.query.date || todayDate();
+    const expenses = await expensesCollection
+      .find({ date })
+      .sort({ createdAt: -1, _id: -1 })
+      .toArray();
+
+    res.json(expenses.map(mapExpense));
+  }),
+);
+
+app.get(
+  "/api/dashboard/today",
+  asyncHandler(async (_req, res) => {
+    const date = todayDate();
+    const settings = await getSettings();
+    const expenses = await expensesCollection
+      .find({ date })
+      .sort({ createdAt: -1, _id: -1 })
+      .toArray();
+    const normalizedExpenses = expenses.map(mapExpense);
+    const spent = normalizedExpenses.reduce(
+      (sum, row) => sum + toNumber(row.amount),
+      0,
+    );
+
+    res.json({
+      date,
+      ...settings,
+      spent,
+      remaining: settings.dailyBudget - spent,
+      expenses: normalizedExpenses,
+    });
+  }),
+);
+
+app.get(
+  "/api/stats/summary",
+  asyncHandler(async (_req, res) => {
+    const settings = await getSettings();
+    const weeklyExpenses = await expensesCollection
+      .find(
+        { date: { $gte: startOfWeekDate() } },
+        { projection: { amount: 1 } },
+      )
+      .toArray();
+    const monthlyExpenses = await expensesCollection
+      .find(
+        { date: { $regex: `^${monthPrefix()}` } },
+        { projection: { amount: 1 } },
+      )
+      .toArray();
+
+    const weeklySpent = weeklyExpenses.reduce(
+      (sum, item) => sum + toNumber(item.amount),
+      0,
+    );
+    const monthlySpent = monthlyExpenses.reduce(
+      (sum, item) => sum + toNumber(item.amount),
+      0,
+    );
+    const weeklyBudget = settings.dailyBudget * 7;
+    const monthlyBudget = settings.dailyBudget * new Date().getDate();
+
+    res.json({
+      ...settings,
+      weeklyBudget,
+      weeklySpent,
+      weeklySaved: Math.max(weeklyBudget - weeklySpent, 0),
+      monthlyBudget,
+      monthlySpent,
+      monthlySaved: Math.max(monthlyBudget - monthlySpent, 0),
+    });
+  }),
+);
+
+app.get(
+  "/api/stats/weekly",
+  asyncHandler(async (_req, res) => {
+    const rows = await expensesCollection
+      .aggregate([
+        { $match: { date: { $gte: startOfWeekDate() } } },
+        { $group: { _id: "$date", total: { $sum: "$amount" } } },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray();
+
+    res.json(
+      rows.map((row) => ({
+        date: normalizeDateValue(row._id),
+        total: toNumber(row.total),
+      })),
+    );
+  }),
+);
+
+app.get(
+  "/api/stats/monthly",
+  asyncHandler(async (_req, res) => {
+    const rows = await expensesCollection
+      .aggregate([
+        { $match: { date: { $regex: `^${monthPrefix()}` } } },
+        { $group: { _id: "$date", total: { $sum: "$amount" } } },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray();
+
+    res.json(
+      rows.map((row) => ({
+        date: normalizeDateValue(row._id),
+        total: toNumber(row.total),
+      })),
+    );
+  }),
+);
+
+app.post(
+  "/api/gym",
+  asyncHandler(async (req, res) => {
+    const date = req.body.date || todayDate();
+    const completed = Boolean(req.body.completed);
+    const sessionLabel = req.body.sessionLabel || "6-7 AM Gym";
+    const notes = req.body.notes || "";
+
+    if (!date || typeof req.body.completed !== "boolean") {
+      return res
+        .status(400)
+        .json({ message: "date and completed are required" });
+    }
+
+    await gymLogsCollection.updateOne(
+      { date },
+      {
+        $set: {
+          completed,
+          sessionLabel,
+          notes,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+        },
       },
-    },
-    { upsert: true },
-  );
+      { upsert: true },
+    );
 
-  res.json({ dailyBudget, currencyCode });
-}));
+    res.json({
+      date,
+      completed,
+      sessionLabel,
+      notes,
+    });
+  }),
+);
 
-app.post("/api/expenses", asyncHandler(async (req, res) => {
-  const amount = toNumber(req.body.amount);
-  const date = req.body.date || todayDate();
-  const note = req.body.note || "";
-  const category = req.body.category || "general";
+app.get(
+  "/api/gym",
+  asyncHandler(async (_req, res) => {
+    const gymLogs = await gymLogsCollection
+      .find({})
+      .sort({ date: -1, _id: -1 })
+      .toArray();
 
-  if (!amount || !date) {
-    return res.status(400).json({ message: "amount and date are required" });
-  }
+    res.json(gymLogs.map(mapGymLog));
+  }),
+);
 
-  const result = await expensesCollection.insertOne({
-    amount,
-    note,
-    category,
-    date,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+app.get(
+  "/api/gym/summary",
+  asyncHandler(async (_req, res) => {
+    const logs = await gymLogsCollection
+      .find({ date: { $gte: startOfWeekDate() } })
+      .sort({ date: 1, _id: 1 })
+      .toArray();
 
-  res.status(201).json({
-    id: String(result.insertedId),
-    amount,
-    note,
-    category,
-    date,
-  });
-}));
+    const normalized = logs.map(mapGymLog);
+    const completedDays = normalized.filter((row) => row.completed).length;
 
-app.get("/api/expenses/daily", asyncHandler(async (req, res) => {
-  const date = req.query.date || todayDate();
-  const expenses = await expensesCollection
-    .find({ date })
-    .sort({ createdAt: -1, _id: -1 })
-    .toArray();
-
-  res.json(expenses.map(mapExpense));
-}));
-
-app.get("/api/dashboard/today", asyncHandler(async (_req, res) => {
-  const date = todayDate();
-  const settings = await getSettings();
-  const expenses = await expensesCollection
-    .find({ date })
-    .sort({ createdAt: -1, _id: -1 })
-    .toArray();
-  const normalizedExpenses = expenses.map(mapExpense);
-  const spent = normalizedExpenses.reduce((sum, row) => sum + toNumber(row.amount), 0);
-
-  res.json({
-    date,
-    ...settings,
-    spent,
-    remaining: settings.dailyBudget - spent,
-    expenses: normalizedExpenses,
-  });
-}));
-
-app.get("/api/stats/summary", asyncHandler(async (_req, res) => {
-  const settings = await getSettings();
-  const weeklyExpenses = await expensesCollection
-    .find({ date: { $gte: startOfWeekDate() } }, { projection: { amount: 1 } })
-    .toArray();
-  const monthlyExpenses = await expensesCollection
-    .find({ date: { $regex: `^${monthPrefix()}` } }, { projection: { amount: 1 } })
-    .toArray();
-
-  const weeklySpent = weeklyExpenses.reduce((sum, item) => sum + toNumber(item.amount), 0);
-  const monthlySpent = monthlyExpenses.reduce((sum, item) => sum + toNumber(item.amount), 0);
-  const weeklyBudget = settings.dailyBudget * 7;
-  const monthlyBudget = settings.dailyBudget * new Date().getDate();
-
-  res.json({
-    ...settings,
-    weeklyBudget,
-    weeklySpent,
-    weeklySaved: Math.max(weeklyBudget - weeklySpent, 0),
-    monthlyBudget,
-    monthlySpent,
-    monthlySaved: Math.max(monthlyBudget - monthlySpent, 0),
-  });
-}));
-
-app.get("/api/stats/weekly", asyncHandler(async (_req, res) => {
-  const rows = await expensesCollection.aggregate([
-    { $match: { date: { $gte: startOfWeekDate() } } },
-    { $group: { _id: "$date", total: { $sum: "$amount" } } },
-    { $sort: { _id: 1 } },
-  ]).toArray();
-
-  res.json(rows.map((row) => ({
-    date: normalizeDateValue(row._id),
-    total: toNumber(row.total),
-  })));
-}));
-
-app.get("/api/stats/monthly", asyncHandler(async (_req, res) => {
-  const rows = await expensesCollection.aggregate([
-    { $match: { date: { $regex: `^${monthPrefix()}` } } },
-    { $group: { _id: "$date", total: { $sum: "$amount" } } },
-    { $sort: { _id: 1 } },
-  ]).toArray();
-
-  res.json(rows.map((row) => ({
-    date: normalizeDateValue(row._id),
-    total: toNumber(row.total),
-  })));
-}));
-
-app.post("/api/gym", asyncHandler(async (req, res) => {
-  const date = req.body.date || todayDate();
-  const completed = Boolean(req.body.completed);
-  const sessionLabel = req.body.sessionLabel || "6-7 AM Gym";
-  const notes = req.body.notes || "";
-
-  if (!date || typeof req.body.completed !== "boolean") {
-    return res.status(400).json({ message: "date and completed are required" });
-  }
-
-  await gymLogsCollection.updateOne(
-    { date },
-    {
-      $set: {
-        completed,
-        sessionLabel,
-        notes,
-        updatedAt: new Date(),
-      },
-      $setOnInsert: {
-        createdAt: new Date(),
-      },
-    },
-    { upsert: true },
-  );
-
-  res.json({
-    date,
-    completed,
-    sessionLabel,
-    notes,
-  });
-}));
-
-app.get("/api/gym", asyncHandler(async (_req, res) => {
-  const gymLogs = await gymLogsCollection
-    .find({})
-    .sort({ date: -1, _id: -1 })
-    .toArray();
-
-  res.json(gymLogs.map(mapGymLog));
-}));
-
-app.get("/api/gym/summary", asyncHandler(async (_req, res) => {
-  const logs = await gymLogsCollection
-    .find({ date: { $gte: startOfWeekDate() } })
-    .sort({ date: 1, _id: 1 })
-    .toArray();
-
-  const normalized = logs.map(mapGymLog);
-  const completedDays = normalized.filter((row) => row.completed).length;
-
-  res.json({
-    completedDays,
-    weeklyConsistency: Math.round((completedDays / 7) * 100),
-    logs: normalized,
-  });
-}));
+    res.json({
+      completedDays,
+      weeklyConsistency: Math.round((completedDays / 7) * 100),
+      logs: normalized,
+    });
+  }),
+);
 
 app.use((error, _req, res, _next) => {
   console.error(error);
   res.status(500).json({
-    message: error.message || "Something went wrong while processing the request.",
+    message:
+      error.message || "Something went wrong while processing the request.",
   });
 });
 

@@ -12,6 +12,10 @@ out/
 dist/
 build/
 
+# Uploads
+uploads/
+backend/uploads/
+
 # Misc
 .DS_Store
 *.pem
