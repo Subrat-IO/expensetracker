@@ -543,6 +543,67 @@ app.post(
   }),
 );
 
+app.put(
+  "/api/expenses/:id",
+  asyncHandler(async (req, res) => {
+    const expenseId = req.params.id;
+    const amount = toNumber(req.body.amount);
+    const note = req.body.note || "";
+    const category = req.body.category || "general";
+
+    if (!ObjectId.isValid(expenseId)) {
+      return res.status(400).json({ message: "Invalid expense ID" });
+    }
+
+    if (!amount) {
+      return res.status(400).json({ message: "amount is required" });
+    }
+
+    const result = await expensesCollection.updateOne(
+      { _id: new ObjectId(expenseId) },
+      {
+        $set: {
+          amount,
+          note,
+          category,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
+
+    const updatedExpense = await expensesCollection.findOne({
+      _id: new ObjectId(expenseId),
+    });
+
+    res.json(mapExpense(updatedExpense));
+  }),
+);
+
+app.delete(
+  "/api/expenses/:id",
+  asyncHandler(async (req, res) => {
+    const expenseId = req.params.id;
+
+    if (!ObjectId.isValid(expenseId)) {
+      return res.status(400).json({ message: "Invalid expense ID" });
+    }
+
+    const result = await expensesCollection.deleteOne({
+      _id: new ObjectId(expenseId),
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
+
+    res.json({ ok: true, message: "Expense deleted successfully" });
+  }),
+);
+
 app.get(
   "/api/expenses/daily",
   asyncHandler(async (req, res) => {
