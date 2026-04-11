@@ -419,41 +419,21 @@ const GLOBAL_STYLES = `
 
   /* ── Expense list rows ── */
   .expense-rows { display: flex; flex-direction: column; }
-  .expense-row-wrapper {
-    position: relative; overflow: hidden; 
-    border-bottom: 0.5px solid var(--border);
-  }
-  .expense-row-wrapper:last-child { border-bottom: none; }
   .expense-row {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 14px 0; background: var(--bg);
-    position: relative; z-index: 1;
-    transition: transform 250ms cubic-bezier(0.22,1,0.36,1);
-    touch-action: pan-y;
+    padding: 14px 0; border-bottom: 0.5px solid var(--border);
   }
-  .expense-row.swiped { transform: translateX(-76px); }
-  .expense-row-actions {
-    position: absolute; right: 0; top: 0; bottom: 0;
-    display: flex; gap: 0; height: 100%; width: 76px;
-    z-index: 0;
-  }
-  .expense-btn-delete {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    border: none; cursor: pointer; font-size: 11px; font-weight: 700;
-    transition: background 160ms; color: #fff;
-    background: var(--red); text-transform: uppercase; letter-spacing: 0.05em;
-  }
-  .expense-btn-delete:active { background: rgba(255,69,58,0.85); }
+  .expense-row:last-child { border-bottom: none; padding-bottom: 0; }
   .expense-icon {
     width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
     background: var(--green-dim); border: 0.5px solid rgba(48,209,88,0.15);
-    display: flex; align-items: center; justify-content: center; position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
   }
   .expense-note { font-size: 15px; font-weight: 500; color: var(--text); }
   .expense-time { font-size: 12px; color: var(--text3); margin-top: 2px; }
   .expense-amount {
     font-size: 16px; font-weight: 700;
-    color: var(--text); letter-spacing: -0.02em; flex-shrink: 0; position: relative; z-index: 1;
+    color: var(--text); letter-spacing: -0.02em; flex-shrink: 0;
   }
   .empty-box {
     padding: 28px 18px; text-align: center;
@@ -881,9 +861,6 @@ function HomeTab({
   setNote,
   addExpense,
   isSyncing,
-  onDeleteExpense,
-  onEditExpense,
-  authToken,
 }) {
   const dailyBudget = Number(dashboard?.dailyBudget || 120);
   const spent = Number(dashboard?.spent || 0);
@@ -904,195 +881,143 @@ function HomeTab({
         ? "Limit hit"
         : "Overspent";
 
-  const [swipedId, setSwipedId] = useState(null);
-  const swipeStartXRef = useRef(0);
-
-  function handleSwipeStart(e, expenseId) {
-    swipeStartXRef.current = e.touches?.[0].clientX || 0;
-  }
-
-  function handleSwipeEnd(e, expenseId) {
-    const startX = swipeStartXRef.current;
-    const endX = e.changedTouches?.[0].clientX || 0;
-    const diff = startX - endX;
-    if (diff > 50) {
-      setSwipedId(expenseId);
-    } else if (diff < -50) {
-      setSwipedId(null);
-    }
-  }
-
-  async function deleteExpense(expenseId) {
-    if (!window.confirm("Delete this expense?")) return;
-    try {
-      await fetchJson(
-        `/api/expenses/${expenseId}`,
-        { method: "DELETE" },
-        authToken,
-      );
-      setSwipedId(null);
-      await onDeleteExpense();
-    } catch (err) {
-      console.error("Delete error:", err);
-    }
-  }
-
   return (
     <div className="tab-panel fade-in">
-        {/* Hero */}
-        <div className={`hero hero-${tone}`}>
-          <div className="hero-glow hero-glow-1" />
-          <div className="hero-glow hero-glow-2" />
-          <div className="hero-inner">
-            <div className="hero-row">
-              <div>
-                <p className="hero-eyebrow">Today's spend</p>
-                <p className="hero-amount">{currency(spent, code)}</p>
-              </div>
-              <span className={`pill pill-${tone}`}>
-                <span className="pill-dot" />
-                {pillLabel}
-              </span>
-            </div>
-            <div className="hero-metrics">
-              <div className="hero-metric">
-                <p className="hero-metric-lbl">Remaining</p>
-                <p className="hero-metric-val">
-                  {currency(Math.abs(remaining), code)}
-                </p>
-              </div>
-              <div className="hero-metric">
-                <p className="hero-metric-lbl">Daily cap</p>
-                <p className="hero-metric-val">{currency(dailyBudget, code)}</p>
-              </div>
-            </div>
-            <div className="progress-track">
-              <div
-                className={`progress-fill progress-fill-${tone}`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Add Expense */}
-        <div className="card">
-          <div className="card-header">
+      {/* Hero */}
+      <div className={`hero hero-${tone}`}>
+        <div className="hero-glow hero-glow-1" />
+        <div className="hero-glow hero-glow-2" />
+        <div className="hero-inner">
+          <div className="hero-row">
             <div>
-              <p className="card-eyebrow">Quick add</p>
-              <p className="card-title">Log expense</p>
+              <p className="hero-eyebrow">Today's spend</p>
+              <p className="hero-amount">{currency(spent, code)}</p>
             </div>
+            <span className={`pill pill-${tone}`}>
+              <span className="pill-dot" />
+              {pillLabel}
+            </span>
           </div>
-          <form className="expense-form" onSubmit={addExpense}>
-            <input
-              className="plain-input"
-              type="number"
-              min="1"
-              step="1"
-              inputMode="numeric"
-              placeholder="Amount (₹)"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <input
-              className="plain-input"
-              type="text"
-              placeholder="Coffee, travel, snack…"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </form>
-        </div>
-
-        {/* Expense list */}
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <p className="card-eyebrow">Today</p>
-              <p className="card-title">
-                {expenses.length} {expenses.length === 1 ? "entry" : "entries"}
+          <div className="hero-metrics">
+            <div className="hero-metric">
+              <p className="hero-metric-lbl">Remaining</p>
+              <p className="hero-metric-val">
+                {currency(Math.abs(remaining), code)}
               </p>
             </div>
+            <div className="hero-metric">
+              <p className="hero-metric-lbl">Daily cap</p>
+              <p className="hero-metric-val">{currency(dailyBudget, code)}</p>
+            </div>
           </div>
-          {expenses.length ? (
-            <div className="expense-rows">
-              {expenses.map((exp) => {
-                const expId = String(exp.id || exp._id);
-                const isSwiped = swipedId === expId;
-                return (
-                  <div
-                    key={expId}
-                    className="expense-row-wrapper"
-                    onTouchStart={(e) => handleSwipeStart(e, expId)}
-                    onTouchEnd={(e) => handleSwipeEnd(e, expId)}
-                  >
-                    <div className={`expense-row${isSwiped ? " swiped" : ""}`}>
-                      <div className="expense-icon">
-                        <svg
-                          viewBox="0 0 24 24"
-                          style={{
-                            width: 18,
-                            height: 18,
-                            fill: "none",
-                            stroke: "var(--green)",
-                            strokeWidth: "1.8",
-                            strokeLinecap: "round",
-                            strokeLinejoin: "round",
-                          }}
-                        >
-                          {ICONS.wallet}
-                        </svg>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p className="expense-note">{exp.note || "Unlabelled"}</p>
-                        <p className="expense-time">
-                          {new Date(
-                            exp.createdAt || `${exp.date}T00:00:00`,
-                          ).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
-                      <span className="expense-amount">
-                        {currency(exp.amount, code)}
-                      </span>
-                    </div>
-                    <div className="expense-row-actions">
-                      <button
-                        className="expense-btn-delete"
-                        onClick={() => deleteExpense(expId)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="empty-box">
-              No expenses yet · Keep it intentional 🎯
-            </div>
-          )}
+          <div className="progress-track">
+            <div
+              className={`progress-fill progress-fill-${tone}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         </div>
+      </div>
 
-        <button className="fab" onClick={addExpense} disabled={isSyncing}>
-          <svg
-            viewBox="0 0 24 24"
-            style={{
-              width: 20,
-              height: 20,
-              fill: "none",
-              stroke: "currentColor",
-              strokeWidth: 2.2,
-              strokeLinecap: "round",
-            }}
-          >
-            {ICONS.plus}
-          </svg>
-          <span>{isSyncing ? "Saving…" : "Add Expense"}</span>
-        </button>
+      {/* Add Expense */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <p className="card-eyebrow">Quick add</p>
+            <p className="card-title">Log expense</p>
+          </div>
+        </div>
+        <form className="expense-form" onSubmit={addExpense}>
+          <input
+            className="plain-input"
+            type="number"
+            min="1"
+            step="1"
+            inputMode="numeric"
+            placeholder="Amount (₹)"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <input
+            className="plain-input"
+            type="text"
+            placeholder="Coffee, travel, snack…"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </form>
+      </div>
+
+      {/* Expense list */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <p className="card-eyebrow">Today</p>
+            <p className="card-title">
+              {expenses.length} {expenses.length === 1 ? "entry" : "entries"}
+            </p>
+          </div>
+        </div>
+        {expenses.length ? (
+          <div className="expense-rows">
+            {expenses.map((exp) => (
+              <div className="expense-row" key={String(exp.id || exp._id)}>
+                <div className="expense-icon">
+                  <svg
+                    viewBox="0 0 24 24"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      fill: "none",
+                      stroke: "var(--green)",
+                      strokeWidth: "1.8",
+                      strokeLinecap: "round",
+                      strokeLinejoin: "round",
+                    }}
+                  >
+                    {ICONS.wallet}
+                  </svg>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p className="expense-note">{exp.note || "Unlabelled"}</p>
+                  <p className="expense-time">
+                    {new Date(
+                      exp.createdAt || `${exp.date}T00:00:00`,
+                    ).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <span className="expense-amount">
+                  {currency(exp.amount, code)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-box">
+            No expenses yet · Keep it intentional 🎯
+          </div>
+        )}
+      </div>
+
+      <button className="fab" onClick={addExpense} disabled={isSyncing}>
+        <svg
+          viewBox="0 0 24 24"
+          style={{
+            width: 20,
+            height: 20,
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: 2.2,
+            strokeLinecap: "round",
+          }}
+        >
+          {ICONS.plus}
+        </svg>
+        <span>{isSyncing ? "Saving…" : "Add Expense"}</span>
+      </button>
     </div>
   );
 }
@@ -1331,16 +1256,11 @@ function ProfileButton({ currentUser, authToken, onProfileUpdate }) {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    // Load profile image from localStorage or use default
+    // Load profile image from localStorage
     const savedImg = window.localStorage.getItem(
       `profile_img_${currentUser?.id}`,
     );
-    if (savedImg) {
-      setProfileImg(savedImg);
-    } else {
-      // Use default profile image from public folder
-      setProfileImg("/myprofile.png");
-    }
+    if (savedImg) setProfileImg(savedImg);
   }, [currentUser?.id]);
 
   async function handleFileUpload(e) {
@@ -1364,20 +1284,15 @@ function ProfileButton({ currentUser, authToken, onProfileUpdate }) {
 
       // Store the image data
       if (data.imageUrl) {
-        const fullImageUrl = data.imageUrl.startsWith("http")
-          ? data.imageUrl
-          : `${API_BASE_URL}${data.imageUrl}`;
-        setProfileImg(fullImageUrl);
+        setProfileImg(data.imageUrl);
         window.localStorage.setItem(
           `profile_img_${currentUser?.id}`,
-          fullImageUrl,
+          data.imageUrl,
         );
       }
       onProfileUpdate?.();
     } catch (err) {
       console.error("Profile upload error:", err);
-      // Fall back to default image on error
-      setProfileImg("/myprofile.png");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1401,12 +1316,7 @@ function ProfileButton({ currentUser, authToken, onProfileUpdate }) {
         disabled={uploading}
       >
         {profileImg ? (
-          <img
-            src={profileImg}
-            alt="Profile"
-            className="topbar-profile-img"
-            onError={() => setProfileImg(null)}
-          />
+          <img src={profileImg} alt="Profile" className="topbar-profile-img" />
         ) : (
           <span className="topbar-profile-initials">{initials}</span>
         )}
@@ -1822,9 +1732,6 @@ export default function AppShell() {
               setNote={setNote}
               addExpense={addExpense}
               isSyncing={isSyncing}
-              onDeleteExpense={loadAppData}
-              onEditExpense={loadAppData}
-              authToken={authToken}
             />
           )}
           {activeTab === "stats" && (
