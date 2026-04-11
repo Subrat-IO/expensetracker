@@ -51,9 +51,17 @@ const ICONS = {
   ),
   check: <path d="M20 6L9 17l-5-5" />,
   arrow_up: <path d="M7 17l10-10M7 7h10v10" />,
+  trash: <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />,
+  edit: (
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  ),
+  close: <path d="M18 6 6 18M6 6l12 12" />,
+  camera: (
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+  ),
 };
 
-// ─── Global styles injected once ─────────────────────────────────────────────
+// ─── Global styles ────────────────────────────────────────────────────────────
 const GLOBAL_STYLES = `
   :root {
     --bg:           #000000;
@@ -96,476 +104,262 @@ const GLOBAL_STYLES = `
   input  { font: inherit; width: 100%; outline: none; letter-spacing: -0.01em; }
   #__next { min-height: 100%; }
 
-  /* ── Loading ── */
-  .ls-wrap {
-    display: grid; place-items: center; gap: 24px; text-align: center;
-    min-height: 100vh; background: #000;
-  }
-  .ls-ring {
-    width: 60px; height: 60px; border-radius: 50%;
-    border: 2.5px solid rgba(48,209,88,0.12);
-    border-top-color: var(--green);
-    animation: spin 1.2s linear infinite;
-  }
+  .ls-wrap { display: grid; place-items: center; gap: 24px; text-align: center; min-height: 100vh; background: #000; }
+  .ls-ring { width: 60px; height: 60px; border-radius: 50%; border: 2.5px solid rgba(48,209,88,0.12); border-top-color: var(--green); animation: spin 1.2s linear infinite; }
   @keyframes spin { 100% { transform: rotate(360deg); } }
-  .ls-label {
-    font-size: 13px; font-weight: 600;
-    letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3);
-  }
+  .ls-label { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
 
-  /* ── Login ── */
-  .login-wrap {
-    min-height: 100vh; width: 100vw;
-    padding: calc(var(--safe-top) + 48px) 24px calc(var(--safe-bottom) + 48px);
-    background: #000;
-    display: flex; flex-direction: column; justify-content: center; gap: 40px;
-    position: relative; overflow: hidden;
-  }
-  .login-orb {
-    position: absolute; border-radius: 50%; pointer-events: none;
-  }
-  .login-orb-1 {
-    width: 320px; height: 320px;
-    background: radial-gradient(circle, rgba(48,209,88,0.18) 0%, transparent 70%);
-    top: -80px; right: -80px; blur-radius: 80px;
-  }
-  .login-orb-2 {
-    width: 280px; height: 280px;
-    background: radial-gradient(circle, rgba(10,132,255,0.12) 0%, transparent 70%);
-    bottom: 60px; left: -80px;
-  }
-  .login-brand {
-    position: relative; z-index: 1;
-    display: flex; flex-direction: column; gap: 12px;
-  }
-  .login-eyebrow {
-    font-size: 11px; font-weight: 700;
-    letter-spacing: 0.12em; text-transform: uppercase; color: var(--green);
-  }
-  .login-title {
-    font-size: clamp(2.4rem, 10vw, 3.6rem);
-    font-weight: 800; line-height: 1.0; letter-spacing: -0.03em; color: var(--text);
-    -webkit-font-smoothing: antialiased;
-  }
+  .login-wrap { min-height: 100vh; width: 100vw; padding: calc(var(--safe-top) + 48px) 24px calc(var(--safe-bottom) + 48px); background: #000; display: flex; flex-direction: column; justify-content: center; gap: 40px; position: relative; overflow: hidden; }
+  .login-orb { position: absolute; border-radius: 50%; pointer-events: none; }
+  .login-orb-1 { width: 320px; height: 320px; background: radial-gradient(circle, rgba(48,209,88,0.18) 0%, transparent 70%); top: -80px; right: -80px; }
+  .login-orb-2 { width: 280px; height: 280px; background: radial-gradient(circle, rgba(10,132,255,0.12) 0%, transparent 70%); bottom: 60px; left: -80px; }
+  .login-brand { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 12px; }
+  .login-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); }
+  .login-title { font-size: clamp(2.4rem, 10vw, 3.6rem); font-weight: 800; line-height: 1.0; letter-spacing: -0.03em; color: var(--text); }
   .login-title em { font-style: normal; color: var(--green); }
   .login-sub { font-size: 15px; color: var(--text2); line-height: 1.6; max-width: 320px; }
-
-  .login-card {
-    position: relative; z-index: 1;
-    background: var(--s1);
-    border: 0.5px solid var(--border3);
-    border-radius: var(--r-2xl);
-    padding: 28px 24px;
-    display: flex; flex-direction: column; gap: 18px;
-    animation: slideUp 500ms cubic-bezier(0.22,1,0.36,1) both;
-    animation-delay: 120ms;
-    backdrop-filter: blur(20px);
-  }
+  .login-card { position: relative; z-index: 1; background: var(--s1); border: 0.5px solid var(--border3); border-radius: var(--r-2xl); padding: 28px 24px; display: flex; flex-direction: column; gap: 18px; animation: slideUp 500ms cubic-bezier(0.22,1,0.36,1) both; animation-delay: 120ms; backdrop-filter: blur(20px); }
   @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
-  .field-lbl {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
-    text-transform: uppercase; color: var(--text3); margin-bottom: 8px;
-  }
+  .field-lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
   .field-wrap { position: relative; }
-  .field-icon {
-    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
-    width: 18px; height: 18px; opacity: 0.35; pointer-events: none;
-  }
-  .field-input {
-    height: 52px; width: 100%;
-    padding: 0 16px 0 48px;
-    background: rgba(255,255,255,0.06);
-    border: 0.5px solid var(--border2);
-    border-radius: var(--r-md);
-    color: var(--text); font-size: 16px; font-weight: 400;
-    transition: border-color 160ms, box-shadow 160ms, background 160ms;
-    letter-spacing: -0.01em;
-  }
+  .field-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; opacity: 0.35; pointer-events: none; }
+  .field-input { height: 52px; width: 100%; padding: 0 16px 0 48px; background: rgba(255,255,255,0.06); border: 0.5px solid var(--border2); border-radius: var(--r-md); color: var(--text); font-size: 16px; font-weight: 400; transition: border-color 160ms, box-shadow 160ms, background 160ms; letter-spacing: -0.01em; }
   .field-input::placeholder { color: var(--text3); }
-  .field-input:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px rgba(48,209,88,0.16), inset 0 0 0 0.5px var(--green);
-    background: rgba(255,255,255,0.08);
-  }
-  .login-error {
-    padding: 14px 16px; border-radius: var(--r-sm);
-    background: rgba(255,69,58,0.13); border: 0.5px solid rgba(255,69,58,0.28);
-    color: var(--red); font-size: 14px; font-weight: 500;
-  }
-  .btn-primary {
-    height: 56px; border-radius: var(--r-pill);
-    background: var(--green); color: #000;
-    font-size: 15px; font-weight: 700; letter-spacing: 0.01em;
-    box-shadow: 0 0 28px rgba(48,209,88,0.32);
-    transition: transform var(--transition), box-shadow var(--transition), opacity 140ms;
-    width: 100%;
-    border: none; cursor: pointer;
-  }
+  .field-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(48,209,88,0.16), inset 0 0 0 0.5px var(--green); background: rgba(255,255,255,0.08); }
+  .login-error { padding: 14px 16px; border-radius: var(--r-sm); background: rgba(255,69,58,0.13); border: 0.5px solid rgba(255,69,58,0.28); color: var(--red); font-size: 14px; font-weight: 500; }
+  .btn-primary { height: 56px; border-radius: var(--r-pill); background: var(--green); color: #000; font-size: 15px; font-weight: 700; letter-spacing: 0.01em; box-shadow: 0 0 28px rgba(48,209,88,0.32); transition: transform var(--transition), box-shadow var(--transition), opacity 140ms; width: 100%; border: none; cursor: pointer; }
   .btn-primary:active { transform: scale(0.96); opacity: 0.85; }
   .btn-primary:disabled { opacity: 0.48; cursor: not-allowed; }
-  .login-hint {
-    text-align: center; font-size: 12px; color: var(--text3); font-weight: 400;
-  }
-  .login-footer {
-    position: relative; z-index: 1; text-align: center;
-    font-size: 11px; font-weight: 600;
-    letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3);
-  }
+  .login-hint { text-align: center; font-size: 12px; color: var(--text3); font-weight: 400; }
+  .login-footer { position: relative; z-index: 1; text-align: center; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
 
-  /* ── App Shell ── */
-  .shell {
-    width: 100vw; height: 100vh; display: flex; flex-direction: column;
-    background: #000; overflow: hidden;
-    padding-top: calc(var(--safe-top) + 8px);
-    padding-bottom: var(--safe-bottom);
-  }
+  .shell { width: 100vw; height: 100vh; display: flex; flex-direction: column; background: #000; overflow: hidden; padding-top: calc(var(--safe-top) + 8px); padding-bottom: var(--safe-bottom); }
 
-  /* ── Topbar ── */
-  .topbar {
-    padding: 18px 22px 16px;
-    display: flex; justify-content: space-between; align-items: flex-start;
-    gap: 16px;
-  }
+  .topbar { padding: 18px 22px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   .topbar-left { flex: 1; min-width: 0; }
-  .topbar-greeting {
-    font-size: 11px; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase; color: var(--green);
-    margin-bottom: 4px;
-  }
-  .topbar-name {
-    font-size: clamp(1.8rem, 6vw, 2.4rem);
-    font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; color: var(--text);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    -webkit-font-smoothing: antialiased;
-  }
-  .topbar-date {
-    margin-top: 10px;
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 8px 12px; border-radius: var(--r-sm);
-    background: rgba(48,209,88,0.1); border: 0.5px solid rgba(48,209,88,0.2);
-  }
-  .topbar-date-tag {
-    height: 22px; padding: 0 9px; border-radius: var(--r-pill);
-    background: var(--green); color: #000;
-    font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
-    display: flex; align-items: center;
-  }
+  .topbar-greeting { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green); margin-bottom: 4px; }
+  .topbar-name { font-size: clamp(1.8rem, 6vw, 2.4rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-date { margin-top: 10px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--r-sm); background: rgba(48,209,88,0.1); border: 0.5px solid rgba(48,209,88,0.2); }
+  .topbar-date-tag { height: 22px; padding: 0 9px; border-radius: var(--r-pill); background: var(--green); color: #000; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; display: flex; align-items: center; }
   .topbar-date-text { font-size: 13px; font-weight: 500; color: var(--text2); }
-
-  .topbar-budget-pill {
-    height: 38px; padding: 0 14px; border-radius: var(--r-pill);
-    background: rgba(48,209,88,0.08); border: 0.5px solid rgba(48,209,88,0.2);
-    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
-  }
-  .topbar-budget-dot {
-    width: 6px; height: 6px; border-radius: 50%; background: var(--green);
-    box-shadow: 0 0 8px var(--green);
-  }
-  .topbar-budget-text {
-    font-size: 13px; font-weight: 700;
-    color: var(--text); letter-spacing: -0.01em;
-  }
-
-  .topbar-profile-btn {
-    width: 44px; height: 44px; border-radius: var(--r-pill);
-    background: rgba(48,209,88,0.1); border: 1.5px solid rgba(48,209,88,0.3);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; cursor: pointer;
-    transition: background var(--transition), border-color var(--transition), transform 120ms ease;
-    position: relative; overflow: hidden;
-  }
+  .topbar-budget-pill { height: 38px; padding: 0 14px; border-radius: var(--r-pill); background: rgba(48,209,88,0.08); border: 0.5px solid rgba(48,209,88,0.2); display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .topbar-budget-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .topbar-budget-text { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+  .topbar-profile-btn { width: 44px; height: 44px; border-radius: var(--r-pill); background: rgba(48,209,88,0.1); border: 1.5px solid rgba(48,209,88,0.3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: background var(--transition), border-color var(--transition), transform 120ms ease; position: relative; overflow: hidden; }
   .topbar-profile-btn:hover { background: rgba(48,209,88,0.15); border-color: rgba(48,209,88,0.4); }
   .topbar-profile-btn:active { transform: scale(0.95); }
-  
-  .topbar-profile-img {
-    width: 100%; height: 100%; border-radius: 50%;
-    object-fit: cover; background: rgba(255,255,255,0.05);
-  }
-  
-  .topbar-profile-initials {
-    font-size: 14px; font-weight: 700; color: var(--green);
-    letter-spacing: -0.02em;
-  }
-  
-  .profile-upload-input {
-    display: none;
-  }
+  .topbar-profile-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+  .topbar-profile-initials { font-size: 14px; font-weight: 700; color: var(--green); letter-spacing: -0.02em; }
+  .profile-upload-input { display: none; }
 
-  /* ── Content ── */
-  .content {
-    flex: 1; overflow-y: auto; padding: 4px 18px 140px;
-    scrollbar-width: none;
-  }
+  .content { flex: 1; overflow-y: auto; padding: 4px 18px 140px; scrollbar-width: none; }
   .content::-webkit-scrollbar { display: none; }
 
-  /* ── Error Banner ── */
-  .error-banner {
-    margin-bottom: 16px; padding: 14px 16px; border-radius: var(--r-md);
-    background: rgba(255,69,58,0.11); border: 0.5px solid rgba(255,69,58,0.24);
-    color: var(--red); font-size: 14px; font-weight: 500;
-  }
-
-  /* ── Tab Panel ── */
+  .error-banner { margin-bottom: 16px; padding: 14px 16px; border-radius: var(--r-md); background: rgba(255,69,58,0.11); border: 0.5px solid rgba(255,69,58,0.24); color: var(--red); font-size: 14px; font-weight: 500; }
   .tab-panel { display: flex; flex-direction: column; gap: 16px; }
 
-  /* ── Hero Card ── */
-  .hero {
-    border-radius: var(--r-2xl); padding: 26px 22px;
-    position: relative; overflow: hidden;
-    border: 0.5px solid transparent;
-    backdrop-filter: blur(10px);
-  }
-  .hero-success {
-    background: linear-gradient(145deg, #0b1f10 0%, #060e09 100%);
-    border-color: rgba(48,209,88,0.22);
-  }
-  .hero-warning {
-    background: linear-gradient(145deg, #1a1500 0%, #0e0b00 100%);
-    border-color: rgba(255,214,10,0.22);
-  }
-  .hero-danger {
-    background: linear-gradient(145deg, #1f0a09 0%, #0e0504 100%);
-    border-color: rgba(255,69,58,0.22);
-  }
-  .hero-glow {
-    position: absolute; border-radius: 50%; pointer-events: none;
-  }
-  .hero-glow-1 {
-    width: 220px; height: 220px;
-    top: -70px; right: -50px;
-    background: radial-gradient(circle, rgba(48,209,88,0.22), transparent 70%);
-  }
-  .hero-glow-2 {
-    width: 160px; height: 160px;
-    bottom: -40px; left: -20px;
-    background: radial-gradient(circle, rgba(255,214,10,0.1), transparent 70%);
-  }
+  .hero { border-radius: var(--r-2xl); padding: 26px 22px; position: relative; overflow: hidden; border: 0.5px solid transparent; backdrop-filter: blur(10px); }
+  .hero-success { background: linear-gradient(145deg, #0b1f10 0%, #060e09 100%); border-color: rgba(48,209,88,0.22); }
+  .hero-warning { background: linear-gradient(145deg, #1a1500 0%, #0e0b00 100%); border-color: rgba(255,214,10,0.22); }
+  .hero-danger { background: linear-gradient(145deg, #1f0a09 0%, #0e0504 100%); border-color: rgba(255,69,58,0.22); }
+  .hero-glow { position: absolute; border-radius: 50%; pointer-events: none; }
+  .hero-glow-1 { width: 220px; height: 220px; top: -70px; right: -50px; background: radial-gradient(circle, rgba(48,209,88,0.22), transparent 70%); }
+  .hero-glow-2 { width: 160px; height: 160px; bottom: -40px; left: -20px; background: radial-gradient(circle, rgba(255,214,10,0.1), transparent 70%); }
   .hero-warning .hero-glow-1 { background: radial-gradient(circle, rgba(255,214,10,0.22), transparent 70%); }
-  .hero-danger  .hero-glow-1 { background: radial-gradient(circle, rgba(255,69,58,0.22), transparent 70%); }
-
+  .hero-danger .hero-glow-1 { background: radial-gradient(circle, rgba(255,69,58,0.22), transparent 70%); }
   .hero-inner { position: relative; z-index: 1; }
   .hero-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-  .hero-eyebrow {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--green); margin-bottom: 6px;
-  }
+  .hero-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green); margin-bottom: 6px; }
   .hero-warning .hero-eyebrow { color: var(--yellow); }
-  .hero-danger  .hero-eyebrow { color: var(--red); }
-
-  .hero-amount {
-    font-size: 44px; font-weight: 800;
-    letter-spacing: -0.05em; line-height: 1; color: var(--text);
-  }
-
-  .pill {
-    display: inline-flex; align-items: center; gap: 5px;
-    height: 30px; padding: 0 12px; border-radius: var(--r-pill);
-    font-size: 12px; font-weight: 600; flex-shrink: 0;
-  }
+  .hero-danger .hero-eyebrow { color: var(--red); }
+  .hero-amount { font-size: 44px; font-weight: 800; letter-spacing: -0.05em; line-height: 1; color: var(--text); }
+  .pill { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: var(--r-pill); font-size: 12px; font-weight: 600; flex-shrink: 0; }
   .pill-success { background: rgba(48,209,88,0.15); color: var(--green); border: 0.5px solid rgba(48,209,88,0.25); }
   .pill-warning { background: rgba(255,214,10,0.15); color: var(--yellow); border: 0.5px solid rgba(255,214,10,0.25); }
-  .pill-danger  { background: rgba(255,69,58,0.15);  color: var(--red);   border: 0.5px solid rgba(255,69,58,0.25); }
+  .pill-danger { background: rgba(255,69,58,0.15); color: var(--red); border: 0.5px solid rgba(255,69,58,0.25); }
   .pill-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-
   .hero-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-  .hero-metric {
-    background: rgba(255,255,255,0.06); border: 0.5px solid var(--border);
-    border-radius: var(--r-md); padding: 14px 12px;
-  }
+  .hero-metric { background: rgba(255,255,255,0.06); border: 0.5px solid var(--border); border-radius: var(--r-md); padding: 14px 12px; }
   .hero-metric-lbl { font-size: 11px; color: var(--text3); font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .hero-metric-val {
-    font-size: 20px; font-weight: 700;
-    letter-spacing: -0.03em; color: var(--text);
-  }
-
-  .progress-track {
-    width: 100%; height: 4px; border-radius: var(--r-pill);
-    background: rgba(255,255,255,0.08); overflow: hidden; margin-top: 20px;
-  }
+  .hero-metric-val { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
+  .progress-track { width: 100%; height: 4px; border-radius: var(--r-pill); background: rgba(255,255,255,0.08); overflow: hidden; margin-top: 20px; }
   .progress-fill { height: 100%; border-radius: inherit; transition: width 600ms cubic-bezier(0.22,1,0.36,1); }
   .progress-fill-success { background: linear-gradient(90deg, var(--green2), var(--green)); }
-  .progress-fill-warning  { background: linear-gradient(90deg, #9a8000, var(--yellow)); }
-  .progress-fill-danger   { background: linear-gradient(90deg, #a01c18, var(--red)); }
+  .progress-fill-warning { background: linear-gradient(90deg, #9a8000, var(--yellow)); }
+  .progress-fill-danger { background: linear-gradient(90deg, #a01c18, var(--red)); }
 
-  /* ── Panel Card ── */
-  .card {
-    background: var(--s1); border: 0.5px solid var(--border2);
-    border-radius: var(--r-xl); padding: 20px 18px;
-  }
+  .card { background: var(--s1); border: 0.5px solid var(--border2); border-radius: var(--r-xl); padding: 20px 18px; }
   .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
-  .card-eyebrow {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--text3); margin-bottom: 4px;
-  }
-  .card-title {
-    font-size: 17px; font-weight: 700;
-    letter-spacing: -0.02em; color: var(--text);
-  }
+  .card-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 4px; }
+  .card-title { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 
-  /* ── Add Expense Form ── */
   .expense-form { display: flex; flex-direction: column; gap: 12px; }
-  .plain-input {
-    height: 52px; width: 100%; padding: 0 16px;
-    background: rgba(255,255,255,0.04); border: 0.5px solid var(--border2);
-    border-radius: var(--r-md); color: var(--text); font-size: 16px; font-weight: 400;
-    transition: border-color 160ms, box-shadow 160ms;
-    letter-spacing: -0.01em;
-  }
+  .plain-input { height: 52px; width: 100%; padding: 0 16px; background: rgba(255,255,255,0.04); border: 0.5px solid var(--border2); border-radius: var(--r-md); color: var(--text); font-size: 16px; font-weight: 400; transition: border-color 160ms, box-shadow 160ms; letter-spacing: -0.01em; }
   .plain-input::placeholder { color: var(--text3); }
-  .plain-input:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px rgba(48,209,88,0.12);
-  }
+  .plain-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(48,209,88,0.12); }
 
-  /* ── Expense list rows ── */
-  .expense-rows { display: flex; flex-direction: column; }
-  .expense-row {
+  /* ── Swipeable Expense Rows ── */
+  .expense-rows { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--r-md); }
+
+  .swipe-wrapper {
+    position: relative;
+    overflow: hidden;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .swipe-wrapper:last-child { border-bottom: none; }
+
+  .swipe-actions {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    display: flex;
+    align-items: stretch;
+    z-index: 1;
+  }
+  .swipe-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    width: 72px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    cursor: pointer; border: none; transition: filter 120ms;
+  }
+  .swipe-btn:active { filter: brightness(0.85); }
+  .swipe-btn-edit { background: rgba(10,132,255,0.18); color: var(--blue); }
+  .swipe-btn-delete { background: rgba(255,69,58,0.18); color: var(--red); border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+
+  .swipe-row-inner {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 14px 0; border-bottom: 0.5px solid var(--border);
+    padding: 14px 0;
+    background: transparent;
+    position: relative; z-index: 2;
+    transform: translateX(0);
+    transition: transform 300ms cubic-bezier(0.22,1,0.36,1);
+    will-change: transform;
+    touch-action: pan-y;
+    cursor: grab;
+    user-select: none;
   }
-  .expense-row:last-child { border-bottom: none; padding-bottom: 0; }
-  .expense-icon {
-    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-    background: var(--green-dim); border: 0.5px solid rgba(48,209,88,0.15);
-    display: flex; align-items: center; justify-content: center;
-  }
+  .swipe-row-inner.swiped { transform: translateX(-144px); }
+  .swipe-row-inner:active { cursor: grabbing; }
+
+  .expense-icon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; background: var(--green-dim); border: 0.5px solid rgba(48,209,88,0.15); display: flex; align-items: center; justify-content: center; }
   .expense-note { font-size: 15px; font-weight: 500; color: var(--text); }
   .expense-time { font-size: 12px; color: var(--text3); margin-top: 2px; }
-  .expense-amount {
-    font-size: 16px; font-weight: 700;
-    color: var(--text); letter-spacing: -0.02em; flex-shrink: 0;
-  }
-  .empty-box {
-    padding: 28px 18px; text-align: center;
-    background: rgba(255,255,255,0.03); border: 0.5px dashed var(--border2);
-    border-radius: var(--r-lg); color: var(--text3); font-size: 14px;
-  }
+  .expense-amount { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; flex-shrink: 0; }
+  .empty-box { padding: 28px 18px; text-align: center; background: rgba(255,255,255,0.03); border: 0.5px dashed var(--border2); border-radius: var(--r-lg); color: var(--text3); font-size: 14px; }
 
-  /* ── FAB ── */
-  .fab {
-    position: fixed; bottom: calc(var(--safe-bottom) + 96px); left: 50%; transform: translateX(-50%);
-    height: 54px; padding: 0 28px;
-    background: var(--green); color: #000;
-    border-radius: var(--r-pill);
-    font-size: 15px; font-weight: 700;
-    display: flex; align-items: center; gap: 9px;
-    box-shadow: 0 4px 32px rgba(48,209,88,0.35);
-    transition: transform var(--transition), box-shadow var(--transition);
-    z-index: 50; white-space: nowrap;
+  /* ── Edit Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: flex-end; justify-content: center;
+    animation: fadeIn 200ms ease both;
   }
+  .modal-sheet {
+    width: 100%; max-width: 480px;
+    background: #111114;
+    border: 0.5px solid var(--border3);
+    border-radius: 28px 28px 0 0;
+    padding: 12px 24px 48px;
+    display: flex; flex-direction: column; gap: 20px;
+    animation: sheetUp 320ms cubic-bezier(0.22,1,0.36,1) both;
+  }
+  @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle {
+    width: 36px; height: 4px; border-radius: var(--r-pill);
+    background: var(--border3); margin: 0 auto;
+  }
+  .modal-title { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+  .modal-actions { display: flex; gap: 10px; }
+  .btn-modal-cancel {
+    flex: 1; height: 52px; border-radius: var(--r-pill);
+    background: rgba(255,255,255,0.07); border: 0.5px solid var(--border2);
+    color: var(--text2); font-size: 15px; font-weight: 600;
+    transition: transform var(--transition), background var(--transition);
+  }
+  .btn-modal-cancel:active { transform: scale(0.97); background: rgba(255,255,255,0.1); }
+  .btn-modal-save {
+    flex: 1; height: 52px; border-radius: var(--r-pill);
+    background: var(--green); color: #000;
+    font-size: 15px; font-weight: 700;
+    box-shadow: 0 0 20px rgba(48,209,88,0.28);
+    transition: transform var(--transition), opacity 140ms;
+  }
+  .btn-modal-save:active { transform: scale(0.97); opacity: 0.88; }
+  .btn-modal-save:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* ── Delete confirm ── */
+  .delete-confirm-overlay {
+    position: fixed; inset: 0; z-index: 400;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    animation: fadeIn 180ms ease both;
+  }
+  .delete-confirm-card {
+    width: 100%; max-width: 340px;
+    background: #111114; border: 0.5px solid rgba(255,69,58,0.25);
+    border-radius: var(--r-2xl); padding: 28px 24px;
+    display: flex; flex-direction: column; gap: 20px;
+    animation: scaleIn 250ms cubic-bezier(0.22,1,0.36,1) both;
+  }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  .delete-confirm-icon {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(255,69,58,0.12); border: 0.5px solid rgba(255,69,58,0.25);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto;
+  }
+  .delete-confirm-title { font-size: 18px; font-weight: 700; color: var(--text); text-align: center; }
+  .delete-confirm-sub { font-size: 14px; color: var(--text2); text-align: center; line-height: 1.55; }
+  .delete-confirm-actions { display: flex; gap: 10px; }
+  .btn-delete-cancel { flex: 1; height: 50px; border-radius: var(--r-pill); background: rgba(255,255,255,0.07); border: 0.5px solid var(--border2); color: var(--text2); font-size: 15px; font-weight: 600; transition: transform 120ms ease; }
+  .btn-delete-cancel:active { transform: scale(0.97); }
+  .btn-delete-confirm { flex: 1; height: 50px; border-radius: var(--r-pill); background: rgba(255,69,58,0.15); border: 0.5px solid rgba(255,69,58,0.3); color: var(--red); font-size: 15px; font-weight: 700; transition: transform 120ms ease, background 140ms; }
+  .btn-delete-confirm:active { transform: scale(0.97); background: rgba(255,69,58,0.22); }
+  .btn-delete-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .fab { position: fixed; bottom: calc(var(--safe-bottom) + 96px); left: 50%; transform: translateX(-50%); height: 54px; padding: 0 28px; background: var(--green); color: #000; border-radius: var(--r-pill); font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 9px; box-shadow: 0 4px 32px rgba(48,209,88,0.35); transition: transform var(--transition), box-shadow var(--transition); z-index: 50; white-space: nowrap; }
   .fab:active { transform: translateX(-50%) scale(0.96); }
   .fab:disabled { opacity: 0.5; }
 
-  /* ── Stats ── */
-  .insight-card {
-    border-radius: var(--r-2xl); padding: 28px 22px; position: relative; overflow: hidden;
-    background: linear-gradient(145deg, #0b1f10 0%, #060e09 100%);
-    border: 0.5px solid rgba(48,209,88,0.2);
-  }
-  .insight-glow {
-    position: absolute; top: -60px; right: -60px;
-    width: 200px; height: 200px; border-radius: 50%; pointer-events: none;
-    background: radial-gradient(circle, rgba(48,209,88,0.2), transparent 70%);
-  }
+  .insight-card { border-radius: var(--r-2xl); padding: 28px 22px; position: relative; overflow: hidden; background: linear-gradient(145deg, #0b1f10 0%, #060e09 100%); border: 0.5px solid rgba(48,209,88,0.2); }
+  .insight-glow { position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, rgba(48,209,88,0.2), transparent 70%); }
   .insight-inner { position: relative; z-index: 1; }
-  .insight-label {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--green); margin-bottom: 8px;
-  }
-  .insight-title {
-    font-size: 24px; font-weight: 800;
-    letter-spacing: -0.04em; color: var(--text); line-height: 1.1;
-  }
+  .insight-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green); margin-bottom: 8px; }
+  .insight-title { font-size: 24px; font-weight: 800; letter-spacing: -0.04em; color: var(--text); line-height: 1.1; }
   .insight-sub { font-size: 14px; color: var(--text2); margin-top: 8px; line-height: 1.5; }
-
   .metric-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .metric-tile {
-    background: var(--s1); border: 0.5px solid var(--border2);
-    border-radius: var(--r-lg); padding: 18px 16px;
-  }
-  .metric-lbl {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
-    text-transform: uppercase; color: var(--text3); margin-bottom: 6px;
-  }
-  .metric-val {
-    font-size: 22px; font-weight: 800;
-    letter-spacing: -0.04em; color: var(--text);
-  }
+  .metric-tile { background: var(--s1); border: 0.5px solid var(--border2); border-radius: var(--r-lg); padding: 18px 16px; }
+  .metric-lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .metric-val { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; color: var(--text); }
   .metric-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
-
-  /* Chart */
-  .chart-area {
-    height: 140px; display: flex; align-items: flex-end; gap: 8px; padding-top: 8px;
-  }
+  .chart-area { height: 140px; display: flex; align-items: flex-end; gap: 8px; padding-top: 8px; }
   .chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; justify-content: flex-end; }
-  .chart-bar {
-    width: 100%; border-radius: 4px 4px 2px 2px;
-    background: linear-gradient(180deg, var(--green) 0%, rgba(48,209,88,0.35) 100%);
-    transition: height 400ms cubic-bezier(0.22,1,0.36,1);
-  }
+  .chart-bar { width: 100%; border-radius: 4px 4px 2px 2px; background: linear-gradient(180deg, var(--green) 0%, rgba(48,209,88,0.35) 100%); transition: height 400ms cubic-bezier(0.22,1,0.36,1); }
   .chart-bar-hot { background: linear-gradient(180deg, var(--orange) 0%, rgba(255,69,58,0.35) 100%); }
   .chart-day-lbl { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; }
-
-  /* Comparison */
   .comp-row { display: grid; grid-template-columns: 80px 1fr auto; gap: 12px; align-items: center; margin-top: 14px; }
   .comp-lbl { font-size: 13px; color: var(--text2); }
   .comp-track { width: 100%; height: 4px; background: rgba(255,255,255,0.07); border-radius: var(--r-pill); overflow: hidden; }
-  .comp-fill  { height: 100%; border-radius: inherit; }
-  .comp-fill-green  { background: linear-gradient(90deg, var(--green2), var(--green)); }
+  .comp-fill { height: 100%; border-radius: inherit; }
+  .comp-fill-green { background: linear-gradient(90deg, var(--green2), var(--green)); }
   .comp-fill-yellow { background: linear-gradient(90deg, #8a7000, var(--yellow)); }
   .comp-val { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; }
   .comp-note { font-size: 13px; color: var(--text3); margin-top: 16px; line-height: 1.5; }
 
-  /* ── Gym ── */
-  .gym-hero {
-    border-radius: var(--r-2xl); padding: 26px 22px; position: relative; overflow: hidden;
-    background: linear-gradient(145deg, #0b1f10 0%, #060e09 100%);
-    border: 0.5px solid rgba(48,209,88,0.2);
-  }
-  .gym-hero-glow {
-    position: absolute; top: -60px; right: -60px;
-    width: 200px; height: 200px; border-radius: 50%; pointer-events: none;
-    background: radial-gradient(circle, rgba(48,209,88,0.22), transparent 70%);
-  }
+  .gym-hero { border-radius: var(--r-2xl); padding: 26px 22px; position: relative; overflow: hidden; background: linear-gradient(145deg, #0b1f10 0%, #060e09 100%); border: 0.5px solid rgba(48,209,88,0.2); }
+  .gym-hero-glow { position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, rgba(48,209,88,0.22), transparent 70%); }
   .gym-inner { position: relative; z-index: 1; }
   .gym-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-
-  /* Toggle */
   .ios-toggle-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
   .ios-toggle-lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
-  .ios-toggle {
-    width: 52px; height: 31px; border-radius: var(--r-pill); position: relative;
-    background: rgba(255,255,255,0.12); transition: background 220ms;
-    cursor: pointer;
-  }
+  .ios-toggle { width: 52px; height: 31px; border-radius: var(--r-pill); position: relative; background: rgba(255,255,255,0.12); transition: background 220ms; cursor: pointer; }
   .ios-toggle.on { background: var(--green); }
-  .ios-toggle-thumb {
-    position: absolute; width: 27px; height: 27px;
-    background: #fff; border-radius: 50%;
-    top: 2px; left: 2px;
-    transition: left 220ms cubic-bezier(0.34,1.4,0.64,1);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-  }
+  .ios-toggle-thumb { position: absolute; width: 27px; height: 27px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: left 220ms cubic-bezier(0.34,1.4,0.64,1); box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
   .ios-toggle.on .ios-toggle-thumb { left: 23px; }
-
-  .gym-motive {
-    padding: 18px 16px; border-radius: var(--r-lg);
-    background: rgba(48,209,88,0.06); border: 0.5px solid rgba(48,209,88,0.12);
-    font-size: 14px; color: var(--text2); line-height: 1.6;
-  }
-
-  /* Calendar */
+  .gym-motive { padding: 18px 16px; border-radius: var(--r-lg); background: rgba(48,209,88,0.06); border: 0.5px solid rgba(48,209,88,0.12); font-size: 14px; color: var(--text2); line-height: 1.6; }
   .cal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .cal-day {
-    min-height: 82px; border-radius: var(--r-md);
-    background: rgba(255,255,255,0.04); border: 0.5px solid var(--border);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-    cursor: pointer; transition: background var(--transition), border-color var(--transition), transform 120ms ease;
-    position: relative; overflow: hidden;
-  }
-  .cal-day.done {
-    background: rgba(48,209,88,0.1); border-color: rgba(48,209,88,0.25);
-  }
+  .cal-day { min-height: 82px; border-radius: var(--r-md); background: rgba(255,255,255,0.04); border: 0.5px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; transition: background var(--transition), border-color var(--transition), transform 120ms ease; position: relative; overflow: hidden; }
+  .cal-day.done { background: rgba(48,209,88,0.1); border-color: rgba(48,209,88,0.25); }
   .cal-day.today { outline: 1.5px solid rgba(48,209,88,0.5); outline-offset: -1.5px; }
   .cal-day:active { transform: scale(0.95); }
   .cal-day:disabled { cursor: default; opacity: 0.6; }
@@ -574,101 +368,64 @@ const GLOBAL_STYLES = `
   .cal-check { font-size: 16px; }
   .cal-day.done .cal-lbl { color: rgba(48,209,88,0.7); }
 
-  /* ── Profile ── */
-  .profile-score-card {
-    border-radius: var(--r-2xl); padding: 32px 24px; text-align: center;
-    background: linear-gradient(145deg, #100e1e 0%, #0b091a 100%);
-    border: 0.5px solid rgba(191,90,242,0.2);
-    position: relative; overflow: hidden;
-  }
-  .profile-score-glow {
-    position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
-    width: 240px; height: 240px; border-radius: 50%; pointer-events: none;
-    background: radial-gradient(circle, rgba(191,90,242,0.18), transparent 70%);
-  }
+  .profile-score-card { border-radius: var(--r-2xl); padding: 32px 24px; text-align: center; background: linear-gradient(145deg, #100e1e 0%, #0b091a 100%); border: 0.5px solid rgba(191,90,242,0.2); position: relative; overflow: hidden; }
+  .profile-score-glow { position: absolute; top: -60px; left: 50%; transform: translateX(-50%); width: 240px; height: 240px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, rgba(191,90,242,0.18), transparent 70%); }
   .profile-score-inner { position: relative; z-index: 1; }
-  .profile-score-lbl {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; color: rgba(191,90,242,0.7); margin-bottom: 10px;
-  }
-  .profile-score {
-    font-size: 72px; font-weight: 800;
-    letter-spacing: -0.06em; color: var(--text); line-height: 1;
-  }
-  .profile-score sub {
-    font-size: 28px; font-weight: 600; opacity: 0.4; vertical-align: bottom;
-  }
-  .profile-trend {
-    display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
-    height: 28px; padding: 0 12px; border-radius: var(--r-pill);
-    background: rgba(191,90,242,0.12); border: 0.5px solid rgba(191,90,242,0.2);
-    font-size: 12px; font-weight: 600; color: var(--purple);
-  }
-
+  .profile-score-lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(191,90,242,0.7); margin-bottom: 10px; }
+  .profile-score { font-size: 72px; font-weight: 800; letter-spacing: -0.06em; color: var(--text); line-height: 1; }
+  .profile-score sub { font-size: 28px; font-weight: 600; opacity: 0.4; vertical-align: bottom; }
+  .profile-trend { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; height: 28px; padding: 0 12px; border-radius: var(--r-pill); background: rgba(191,90,242,0.12); border: 0.5px solid rgba(191,90,242,0.2); font-size: 12px; font-weight: 600; color: var(--purple); }
   .stat-list { display: flex; flex-direction: column; gap: 0; }
-  .stat-row {
-    display: flex; justify-content: space-between; align-items: center; gap: 12px;
-    padding: 15px 0; border-bottom: 0.5px solid var(--border);
-  }
+  .stat-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 15px 0; border-bottom: 0.5px solid var(--border); }
   .stat-row:last-child { border-bottom: none; padding-bottom: 0; }
   .stat-name { font-size: 14px; color: var(--text2); }
-  .stat-val  { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-  .stat-badge {
-    height: 24px; padding: 0 10px; border-radius: var(--r-pill);
-    font-size: 11px; font-weight: 600; display: inline-flex; align-items: center;
-  }
-  .stat-badge-good   { background: var(--green-dim); color: var(--green); border: 0.5px solid rgba(48,209,88,0.2); }
-  .stat-badge-warn   { background: var(--yellow-dim); color: var(--yellow); border: 0.5px solid rgba(255,214,10,0.2); }
-
-  .btn-logout {
-    height: 52px; width: 100%; border-radius: var(--r-pill);
-    background: rgba(255,69,58,0.08); border: 0.5px solid rgba(255,69,58,0.2);
-    color: var(--red); font-size: 15px; font-weight: 600;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    transition: transform var(--transition), background var(--transition);
-  }
+  .stat-val { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+  .stat-badge { height: 24px; padding: 0 10px; border-radius: var(--r-pill); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; }
+  .stat-badge-good { background: var(--green-dim); color: var(--green); border: 0.5px solid rgba(48,209,88,0.2); }
+  .stat-badge-warn { background: var(--yellow-dim); color: var(--yellow); border: 0.5px solid rgba(255,214,10,0.2); }
+  .btn-logout { height: 52px; width: 100%; border-radius: var(--r-pill); background: rgba(255,69,58,0.08); border: 0.5px solid rgba(255,69,58,0.2); color: var(--red); font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: transform var(--transition), background var(--transition); }
   .btn-logout:active { transform: scale(0.97); background: rgba(255,69,58,0.14); }
 
-  /* ── Bottom Nav ── */
-  .bottom-nav {
-    position: fixed; left: 0; right: 0; bottom: 0;
-    background: rgba(10,10,12,0.92); border-top: 0.5px solid var(--border2);
-    border-radius: 22px 22px 0 0;
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    padding: 10px 10px calc(var(--safe-bottom) + 12px);
-    z-index: 100;
-    backdrop-filter: blur(15px);
-  }
-  .nav-btn {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
-    height: 58px; border-radius: var(--r-md);
-    color: var(--text3);
-    transition: color var(--transition), background var(--transition), transform 120ms ease;
-    font-weight: 500;
-  }
+  .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(10,10,12,0.92); border-top: 0.5px solid var(--border2); border-radius: 22px 22px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); padding: 10px 10px calc(var(--safe-bottom) + 12px); z-index: 100; backdrop-filter: blur(15px); }
+  .nav-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; height: 58px; border-radius: var(--r-md); color: var(--text3); transition: color var(--transition), background var(--transition), transform 120ms ease; font-weight: 500; }
   .nav-btn.active { color: var(--green); background: rgba(48,209,88,0.12); }
   .nav-btn:active { transform: scale(0.93); }
   .nav-btn-label { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
   .nav-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ── Install chip ── */
-  .install-chip {
-    position: fixed; top: calc(var(--safe-top) + 12px); right: 16px; z-index: 200;
-    height: 38px; padding: 0 16px; border-radius: var(--r-pill);
-    background: var(--s1); border: 0.5px solid var(--border3);
-    color: var(--text); font-size: 13px; font-weight: 600;
-    display: flex; align-items: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  /* ── Profile Photo UI ── */
+  .profile-photo-section {
+    display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px 0 8px;
   }
-
-  /* ── Animations ── */
-  @keyframes spin    { to { transform: rotate(360deg); } }
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(24px); }
-    to   { opacity: 1; transform: translateY(0); }
+  .profile-photo-ring {
+    width: 90px; height: 90px; border-radius: 50%;
+    border: 2px solid rgba(48,209,88,0.4);
+    padding: 3px;
+    background: linear-gradient(145deg, rgba(48,209,88,0.1), rgba(10,132,255,0.08));
+    cursor: pointer; position: relative;
+    transition: border-color 200ms, transform 150ms;
   }
-  @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+  .profile-photo-ring:hover { border-color: rgba(48,209,88,0.7); transform: scale(1.04); }
+  .profile-photo-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+  .profile-photo-initials-big {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: rgba(48,209,88,0.08);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 800; color: var(--green); letter-spacing: -0.03em;
+  }
+  .profile-photo-camera {
+    position: absolute; bottom: 2px; right: 2px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--green); color: #000;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #111114;
+  }
+  .profile-photo-name { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; color: var(--text); }
+  .profile-photo-username { font-size: 13px; color: var(--text3); margin-top: -8px; }
 
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   .fade-in { animation: fadeIn 400ms ease both; }
   .slide-in { animation: slideUp 380ms cubic-bezier(0.22,1,0.36,1) both; }
 `;
@@ -731,12 +488,257 @@ async function fetchJson(path, options = {}, authToken) {
   return response.json();
 }
 
-// ─── Primitive components ─────────────────────────────────────────────────────
-function Icon({ name, className }) {
+// ─── Icon ─────────────────────────────────────────────────────────────────────
+function Icon({ name, className, style }) {
   return (
-    <svg viewBox="0 0 24 24" className={className || "nav-icon"}>
+    <svg viewBox="0 0 24 24" className={className || "nav-icon"} style={style}>
       {ICONS[name]}
     </svg>
+  );
+}
+
+// ─── Swipeable Expense Row ────────────────────────────────────────────────────
+function SwipeableExpenseRow({ exp, code, onEdit, onDelete }) {
+  const [swiped, setSwiped] = useState(false);
+  const [startX, setStartX] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const rowRef = useRef(null);
+
+  function handleTouchStart(e) {
+    setStartX(e.touches[0].clientX);
+    setDragging(true);
+  }
+  function handleTouchMove(e) {
+    if (!dragging || startX === null) return;
+    const dx = e.touches[0].clientX - startX;
+    if (dx < -30) setSwiped(true);
+    if (dx > 30) setSwiped(false);
+  }
+  function handleTouchEnd() {
+    setDragging(false);
+    setStartX(null);
+  }
+
+  // Mouse support for desktop
+  function handleMouseDown(e) {
+    setStartX(e.clientX);
+    setDragging(true);
+  }
+  function handleMouseMove(e) {
+    if (!dragging || startX === null) return;
+    const dx = e.clientX - startX;
+    if (dx < -40) setSwiped(true);
+    if (dx > 40) setSwiped(false);
+  }
+  function handleMouseUp() {
+    setDragging(false);
+    setStartX(null);
+  }
+
+  function handleEditClick(e) {
+    e.stopPropagation();
+    setSwiped(false);
+    onEdit(exp);
+  }
+  function handleDeleteClick(e) {
+    e.stopPropagation();
+    setSwiped(false);
+    onDelete(exp);
+  }
+
+  return (
+    <div className="swipe-wrapper">
+      {/* Hidden actions revealed by swipe */}
+      <div className="swipe-actions">
+        <button className="swipe-btn swipe-btn-edit" onClick={handleEditClick}>
+          <svg
+            viewBox="0 0 24 24"
+            style={{
+              width: 18,
+              height: 18,
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: 1.8,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+            }}
+          >
+            {ICONS.edit}
+          </svg>
+          Edit
+        </button>
+        <button
+          className="swipe-btn swipe-btn-delete"
+          onClick={handleDeleteClick}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            style={{
+              width: 18,
+              height: 18,
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: 1.8,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+            }}
+          >
+            {ICONS.trash}
+          </svg>
+          Delete
+        </button>
+      </div>
+
+      {/* Swipeable row */}
+      <div
+        ref={rowRef}
+        className={`swipe-row-inner${swiped ? " swiped" : ""}`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onClick={() => {
+          if (swiped) {
+            setSwiped(false);
+          }
+        }}
+      >
+        <div className="expense-icon">
+          <svg
+            viewBox="0 0 24 24"
+            style={{
+              width: 18,
+              height: 18,
+              fill: "none",
+              stroke: "var(--green)",
+              strokeWidth: "1.8",
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+            }}
+          >
+            {ICONS.wallet}
+          </svg>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p className="expense-note">{exp.note || "Unlabelled"}</p>
+          <p className="expense-time">
+            {new Date(
+              exp.createdAt || `${exp.date}T00:00:00`,
+            ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </p>
+        </div>
+        <span className="expense-amount">{currency(exp.amount, code)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+function EditExpenseModal({ expense, onSave, onClose, isSaving }) {
+  const [amount, setAmount] = useState(String(expense.amount || ""));
+  const [note, setNote] = useState(expense.note || "");
+
+  function handleSave() {
+    const num = Number(amount);
+    if (!num) return;
+    onSave({ ...expense, amount: num, note: note.trim() });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <p className="modal-title">Edit Expense</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <p className="field-lbl">Amount (₹)</p>
+            <input
+              className="plain-input"
+              type="number"
+              min="1"
+              step="1"
+              inputMode="numeric"
+              placeholder="Amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div>
+            <p className="field-lbl">Note</p>
+            <input
+              className="plain-input"
+              type="text"
+              placeholder="Coffee, travel, snack…"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn-modal-cancel" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn-modal-save"
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete Confirm ───────────────────────────────────────────────────────────
+function DeleteConfirmModal({ expense, onConfirm, onClose, isDeleting, code }) {
+  return (
+    <div className="delete-confirm-overlay" onClick={onClose}>
+      <div className="delete-confirm-card" onClick={(e) => e.stopPropagation()}>
+        <div className="delete-confirm-icon">
+          <svg
+            viewBox="0 0 24 24"
+            style={{
+              width: 24,
+              height: 24,
+              fill: "none",
+              stroke: "var(--red)",
+              strokeWidth: 1.8,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+            }}
+          >
+            {ICONS.trash}
+          </svg>
+        </div>
+        <p className="delete-confirm-title">Delete Expense?</p>
+        <p className="delete-confirm-sub">
+          <strong style={{ color: "var(--text)" }}>
+            {expense.note || "Unlabelled"}
+          </strong>{" "}
+          · {currency(expense.amount, code)}
+          <br />
+          This action cannot be undone.
+        </p>
+        <div className="delete-confirm-actions">
+          <button className="btn-delete-cancel" onClick={onClose}>
+            Keep it
+          </button>
+          <button
+            className="btn-delete-confirm"
+            onClick={onConfirm}
+            disabled={isDeleting}
+          >
+            {isDeleting ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -773,7 +775,6 @@ function LoginScreen({ onLogin }) {
     <main className="login-wrap">
       <div className="login-orb login-orb-1" />
       <div className="login-orb login-orb-2" />
-
       <header className="login-brand">
         <span className="login-eyebrow">Discipline Tracker</span>
         <h1 className="login-title">
@@ -786,7 +787,6 @@ function LoginScreen({ onLogin }) {
           and staying in command.
         </p>
       </header>
-
       <form className="login-card" onSubmit={handleSubmit}>
         <div>
           <p className="field-lbl">Username</p>
@@ -846,7 +846,6 @@ function LoginScreen({ onLogin }) {
         </button>
         <p className="login-hint">admin / 1234 · session ends on close</p>
       </form>
-
       <footer className="login-footer">Stay disciplined daily</footer>
     </main>
   );
@@ -861,6 +860,8 @@ function HomeTab({
   setNote,
   addExpense,
   isSyncing,
+  onEditExpense,
+  onDeleteExpense,
 }) {
   const dailyBudget = Number(dashboard?.dailyBudget || 120);
   const spent = Number(dashboard?.spent || 0);
@@ -883,7 +884,6 @@ function HomeTab({
 
   return (
     <div className="tab-panel fade-in">
-      {/* Hero */}
       <div className={`hero hero-${tone}`}>
         <div className="hero-glow hero-glow-1" />
         <div className="hero-glow hero-glow-2" />
@@ -919,7 +919,6 @@ function HomeTab({
         </div>
       </div>
 
-      {/* Add Expense */}
       <div className="card">
         <div className="card-header">
           <div>
@@ -948,7 +947,6 @@ function HomeTab({
         </form>
       </div>
 
-      {/* Expense list */}
       <div className="card">
         <div className="card-header">
           <div>
@@ -957,42 +955,29 @@ function HomeTab({
               {expenses.length} {expenses.length === 1 ? "entry" : "entries"}
             </p>
           </div>
+          {expenses.length > 0 && (
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--text3)",
+                fontWeight: 500,
+                paddingTop: 4,
+              }}
+            >
+              ← swipe to edit
+            </span>
+          )}
         </div>
         {expenses.length ? (
           <div className="expense-rows">
             {expenses.map((exp) => (
-              <div className="expense-row" key={String(exp.id || exp._id)}>
-                <div className="expense-icon">
-                  <svg
-                    viewBox="0 0 24 24"
-                    style={{
-                      width: 18,
-                      height: 18,
-                      fill: "none",
-                      stroke: "var(--green)",
-                      strokeWidth: "1.8",
-                      strokeLinecap: "round",
-                      strokeLinejoin: "round",
-                    }}
-                  >
-                    {ICONS.wallet}
-                  </svg>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p className="expense-note">{exp.note || "Unlabelled"}</p>
-                  <p className="expense-time">
-                    {new Date(
-                      exp.createdAt || `${exp.date}T00:00:00`,
-                    ).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                <span className="expense-amount">
-                  {currency(exp.amount, code)}
-                </span>
-              </div>
+              <SwipeableExpenseRow
+                key={String(exp.id || exp._id)}
+                exp={exp}
+                code={code}
+                onEdit={onEditExpense}
+                onDelete={onDeleteExpense}
+              />
             ))}
           </div>
         ) : (
@@ -1032,7 +1017,6 @@ function StatsTab({ statsSummary, weeklySeries, monthlySeries }) {
   const monthlyBudget = Number(statsSummary?.monthlyBudget || 0);
   const monthlySpent = Number(statsSummary?.monthlySpent || 0);
   const monthlySaved = Number(statsSummary?.monthlySaved || 0);
-
   const startOfWeek = getStartOfWeek();
   const weekDays = [...Array(7)].map((_, i) => {
     const d = new Date(startOfWeek);
@@ -1062,7 +1046,6 @@ function StatsTab({ statsSummary, weeklySeries, monthlySeries }) {
           </p>
         </div>
       </div>
-
       <div className="metric-row">
         <div className="metric-tile">
           <p className="metric-lbl">Weekly spent</p>
@@ -1077,7 +1060,6 @@ function StatsTab({ statsSummary, weeklySeries, monthlySeries }) {
           </p>
         </div>
       </div>
-
       <div className="card">
         <div className="card-header">
           <div>
@@ -1099,7 +1081,6 @@ function StatsTab({ statsSummary, weeklySeries, monthlySeries }) {
           ))}
         </div>
       </div>
-
       <div className="card">
         <div className="card-header">
           <div>
@@ -1157,14 +1138,12 @@ function GymTab({ gymLogMap, toggleGym, gymSummary, isSyncing }) {
       today: key === todayKey,
     };
   });
-
   let streak = 0;
   const cur = new Date();
   while (gymLogMap[formatDate(cur)]) {
     streak++;
     cur.setDate(cur.getDate() - 1);
   }
-
   const weeklyConsistency =
     Number(gymSummary?.weeklyConsistency) ||
     Math.round((weekDates.filter((d) => d.done).length / 7) * 100);
@@ -1211,14 +1190,12 @@ function GymTab({ gymLogMap, toggleGym, gymSummary, isSyncing }) {
           </div>
         </div>
       </div>
-
       <div className="gym-motive">
         🎯{" "}
         {streak > 0
           ? `${streak}-day streak. Every early session compounds. Protect the habit.`
           : "Start today. The hardest rep is showing up. Make it count."}
       </div>
-
       <div className="card">
         <div className="card-header">
           <div>
@@ -1249,56 +1226,8 @@ function GymTab({ gymLogMap, toggleGym, gymSummary, isSyncing }) {
   );
 }
 
-// ─── Profile Button ───────────────────────────────────────────────────────────
-function ProfileButton({ currentUser, authToken, onProfileUpdate }) {
-  const [profileImg, setProfileImg] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    // Load profile image from localStorage
-    const savedImg = window.localStorage.getItem(
-      `profile_img_${currentUser?.id}`,
-    );
-    if (savedImg) setProfileImg(savedImg);
-  }, [currentUser?.id]);
-
-  async function handleFileUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("userId", currentUser?.id);
-
-      const response = await fetch(`${API_BASE_URL}/api/upload/profile`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${authToken}` },
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("Upload failed");
-      const data = await response.json();
-
-      // Store the image data
-      if (data.imageUrl) {
-        setProfileImg(data.imageUrl);
-        window.localStorage.setItem(
-          `profile_img_${currentUser?.id}`,
-          data.imageUrl,
-        );
-      }
-      onProfileUpdate?.();
-    } catch (err) {
-      console.error("Profile upload error:", err);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
+// ─── Profile Button (Topbar) ──────────────────────────────────────────────────
+function ProfileButton({ currentUser, profileImg, onClickUpload }) {
   const initials =
     currentUser?.name
       ?.split(" ")
@@ -1308,33 +1237,31 @@ function ProfileButton({ currentUser, authToken, onProfileUpdate }) {
       .slice(0, 2) || "U";
 
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        className="topbar-profile-btn"
-        onClick={() => fileInputRef.current?.click()}
-        title="Click to upload profile picture"
-        disabled={uploading}
-      >
-        {profileImg ? (
-          <img src={profileImg} alt="Profile" className="topbar-profile-img" />
-        ) : (
-          <span className="topbar-profile-initials">{initials}</span>
-        )}
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="profile-upload-input"
-        onChange={handleFileUpload}
-        disabled={uploading}
-      />
-    </div>
+    <button
+      className="topbar-profile-btn"
+      onClick={onClickUpload}
+      title="Click to change profile picture"
+    >
+      {profileImg ? (
+        <img src={profileImg} alt="Profile" className="topbar-profile-img" />
+      ) : (
+        <span className="topbar-profile-initials">{initials}</span>
+      )}
+    </button>
   );
 }
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
-function ProfileTab({ statsSummary, gymLogMap, gymSummary, onLogout }) {
+function ProfileTab({
+  statsSummary,
+  gymLogMap,
+  gymSummary,
+  onLogout,
+  currentUser,
+  profileImg,
+  onClickUpload,
+  profileUploading,
+}) {
   const today = new Date();
   const dayOfMonth = today.getDate();
   const monthPrefix = formatDate(today).slice(0, 7);
@@ -1356,9 +1283,63 @@ function ProfileTab({ statsSummary, gymLogMap, gymSummary, onLogout }) {
   );
   const score = Math.round((gymScore + moneyScore) / 2);
   const trending = score >= 70;
+  const initials =
+    currentUser?.name
+      ?.split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "U";
 
   return (
     <div className="tab-panel fade-in">
+      {/* Profile photo section */}
+      <div className="profile-photo-section">
+        <div
+          className="profile-photo-ring"
+          onClick={onClickUpload}
+          title="Tap to change photo"
+        >
+          {profileImg ? (
+            <img
+              src={profileImg}
+              alt="Profile"
+              style={{
+                width: "100%",
+                height: "100%",
+                borderRadius: "50%",
+                objectFit: "cover",
+              }}
+            />
+          ) : (
+            <div className="profile-photo-initials-big">{initials}</div>
+          )}
+          <div className="profile-photo-camera">
+            <svg
+              viewBox="0 0 24 24"
+              style={{
+                width: 13,
+                height: 13,
+                fill: "none",
+                stroke: "#000",
+                strokeWidth: 2,
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+              }}
+            >
+              {ICONS.camera}
+            </svg>
+          </div>
+        </div>
+        <p className="profile-photo-name">{currentUser?.name || "Subrat"}</p>
+        <p className="profile-photo-username">
+          @{currentUser?.username || "subrat"}
+        </p>
+        {profileUploading && (
+          <p style={{ fontSize: 12, color: "var(--text3)" }}>Uploading…</p>
+        )}
+      </div>
+
       <div className="profile-score-card">
         <div className="profile-score-glow" />
         <div className="profile-score-inner">
@@ -1488,6 +1469,17 @@ export default function AppShell() {
     logs: [],
   });
 
+  // Profile picture state
+  const [profileImg, setProfileImg] = useState(null);
+  const [profileUploading, setProfileUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Edit/Delete state
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [deletingExpense, setDeletingExpense] = useState(null);
+  const [isModalSaving, setIsModalSaving] = useState(false);
+  const [isModalDeleting, setIsModalDeleting] = useState(false);
+
   const gymLogMap = useMemo(
     () =>
       Object.fromEntries(
@@ -1504,6 +1496,26 @@ export default function AppShell() {
     setActiveTab("home");
     setErrorMessage(msg || "Session expired. Please log in again.");
   }, []);
+
+  // Load profile image from localStorage whenever user changes
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const saved = window.localStorage.getItem(`profile_img_${currentUser.id}`);
+    if (saved) {
+      setProfileImg(saved);
+    } else {
+      // Try to load the default profile image from the public folder
+      // If it exists at /myprofile.png, use it as a default
+      const img = new Image();
+      img.onload = () => {
+        setProfileImg("/myprofile.png");
+      };
+      img.onerror = () => {
+        setProfileImg(null);
+      };
+      img.src = "/myprofile.png";
+    }
+  }, [currentUser?.id]);
 
   const loadAppData = useCallback(async () => {
     setIsSyncing(true);
@@ -1623,6 +1635,55 @@ export default function AppShell() {
     }
   }
 
+  async function handleSaveEdit(updatedExp) {
+    setIsModalSaving(true);
+    try {
+      const id = updatedExp.id || updatedExp._id;
+      await fetchJson(
+        `/api/expenses/${id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: updatedExp.amount,
+            note: updatedExp.note,
+            category: updatedExp.category || "general",
+          }),
+        },
+        authToken,
+      );
+      setEditingExpense(null);
+      await loadAppData();
+    } catch (err) {
+      if (err.status === 401) {
+        handleSessionExpired(err.message);
+        return;
+      }
+      setErrorMessage(err.message || "Failed to update expense.");
+    } finally {
+      setIsModalSaving(false);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!deletingExpense) return;
+    setIsModalDeleting(true);
+    try {
+      const id = deletingExpense.id || deletingExpense._id;
+      await fetchJson(`/api/expenses/${id}`, { method: "DELETE" }, authToken);
+      setDeletingExpense(null);
+      await loadAppData();
+    } catch (err) {
+      if (err.status === 401) {
+        handleSessionExpired(err.message);
+        return;
+      }
+      setErrorMessage(err.message || "Failed to delete expense.");
+    } finally {
+      setIsModalDeleting(false);
+    }
+  }
+
   async function toggleGym(dateKey) {
     setIsSyncing(true);
     setErrorMessage("");
@@ -1650,6 +1711,58 @@ export default function AppShell() {
       setErrorMessage(err.message || "Failed to update gym log.");
       setIsSyncing(false);
     }
+  }
+
+  // ── Profile upload ──
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProfileUploading(true);
+    try {
+      // Read file as base64 and store locally for instant display
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        setProfileImg(dataUrl);
+        if (currentUser?.id) {
+          window.localStorage.setItem(`profile_img_${currentUser.id}`, dataUrl);
+        }
+      };
+      reader.readAsDataURL(file);
+
+      // Also try uploading to server (best-effort)
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("userId", currentUser?.id || "");
+        const response = await fetch(`${API_BASE_URL}/api/upload/profile`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${authToken}` },
+          body: formData,
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.imageUrl) {
+            setProfileImg(data.imageUrl);
+            if (currentUser?.id) {
+              window.localStorage.setItem(
+                `profile_img_${currentUser.id}`,
+                data.imageUrl,
+              );
+            }
+          }
+        }
+      } catch (_) {
+        // Server upload failed, but local display already works
+      }
+    } finally {
+      setProfileUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function handleProfileUploadClick() {
+    fileInputRef.current?.click();
   }
 
   if (!booted)
@@ -1683,8 +1796,39 @@ export default function AppShell() {
     <>
       <style>{GLOBAL_STYLES}</style>
       <PwaRegister />
+
+      {/* Hidden file input for profile upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="profile-upload-input"
+        onChange={handleFileChange}
+        disabled={profileUploading}
+      />
+
+      {/* Edit Modal */}
+      {editingExpense && (
+        <EditExpenseModal
+          expense={editingExpense}
+          onSave={handleSaveEdit}
+          onClose={() => setEditingExpense(null)}
+          isSaving={isModalSaving}
+        />
+      )}
+
+      {/* Delete Confirm */}
+      {deletingExpense && (
+        <DeleteConfirmModal
+          expense={deletingExpense}
+          code={dashboard?.currencyCode || "INR"}
+          onConfirm={handleConfirmDelete}
+          onClose={() => setDeletingExpense(null)}
+          isDeleting={isModalDeleting}
+        />
+      )}
+
       <main className="shell">
-        {/* Topbar */}
         <header className="topbar">
           <div className="topbar-left">
             <p className="topbar-greeting">{getGreeting(now)}</p>
@@ -1709,20 +1853,18 @@ export default function AppShell() {
             </div>
             <ProfileButton
               currentUser={currentUser}
-              authToken={authToken}
-              onProfileUpdate={() => {}}
+              profileImg={profileImg}
+              onClickUpload={handleProfileUploadClick}
             />
           </div>
         </header>
 
-        {/* Content */}
         <section className="content">
           {errorMessage && (
             <div className="error-banner" role="alert">
               {errorMessage}
             </div>
           )}
-
           {activeTab === "home" && (
             <HomeTab
               dashboard={dashboard}
@@ -1732,6 +1874,8 @@ export default function AppShell() {
               setNote={setNote}
               addExpense={addExpense}
               isSyncing={isSyncing}
+              onEditExpense={setEditingExpense}
+              onDeleteExpense={setDeletingExpense}
             />
           )}
           {activeTab === "stats" && (
@@ -1755,11 +1899,14 @@ export default function AppShell() {
               gymLogMap={gymLogMap}
               gymSummary={gymSummary}
               onLogout={handleLogout}
+              currentUser={currentUser}
+              profileImg={profileImg}
+              onClickUpload={handleProfileUploadClick}
+              profileUploading={profileUploading}
             />
           )}
         </section>
 
-        {/* Bottom Nav */}
         <nav className="bottom-nav" aria-label="Primary navigation">
           {NAV.map(({ tab, icon, label }) => (
             <button
