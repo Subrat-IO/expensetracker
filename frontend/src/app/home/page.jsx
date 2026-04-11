@@ -497,7 +497,14 @@ const HOME_STYLES = `
 `;
 
 // ─── Swipeable Row ────────────────────────────────────────────────────────────
-function SwipeableExpenseRow({ exp, code, onEditTap, onDeleteTap, isFirst, isLast }) {
+function SwipeableExpenseRow({
+  exp,
+  code,
+  onEditTap,
+  onDeleteTap,
+  isFirst,
+  isLast,
+}) {
   const faceRef = useRef(null);
   const startXRef = useRef(null);
   const currentXRef = useRef(0);
@@ -542,10 +549,13 @@ function SwipeableExpenseRow({ exp, code, onEditTap, onDeleteTap, isFirst, isLas
   }
 
   // Close if another row opens
-  useEffect(() => { if (!open) snap(false); }, []);
+  useEffect(() => {
+    if (!open) snap(false);
+  }, []);
 
-  const expTime = new Date(exp.createdAt || `${exp.date}T00:00:00`)
-    .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const expTime = new Date(
+    exp.createdAt || `${exp.date}T00:00:00`,
+  ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="exp-item">
@@ -553,8 +563,11 @@ function SwipeableExpenseRow({ exp, code, onEditTap, onDeleteTap, isFirst, isLas
       <div className="exp-actions">
         <button
           className="exp-action-btn exp-action-edit"
-          onPointerDown={e => e.stopPropagation()}
-          onClick={() => { snap(false); onEditTap(exp); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => {
+            snap(false);
+            onEditTap(exp);
+          }}
         >
           <svg viewBox="0 0 24 24">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -564,8 +577,11 @@ function SwipeableExpenseRow({ exp, code, onEditTap, onDeleteTap, isFirst, isLas
         </button>
         <button
           className="exp-action-btn exp-action-delete"
-          onPointerDown={e => e.stopPropagation()}
-          onClick={() => { snap(false); onDeleteTap(exp); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => {
+            snap(false);
+            onDeleteTap(exp);
+          }}
         >
           <svg viewBox="0 0 24 24">
             <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
@@ -581,7 +597,9 @@ function SwipeableExpenseRow({ exp, code, onEditTap, onDeleteTap, isFirst, isLas
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        onClick={() => { if (open) snap(false); }}
+        onClick={() => {
+          if (open) snap(false);
+        }}
       >
         <div className="exp-cat-dot">
           <svg viewBox="0 0 24 24">
@@ -619,7 +637,11 @@ function EditSheet({ expense, onClose, onSaved, authToken }) {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: num, note: note.trim(), category: expense.category || "general" }),
+          body: JSON.stringify({
+            amount: num,
+            note: note.trim(),
+            category: expense.category || "general",
+          }),
         },
         authToken,
       );
@@ -633,21 +655,28 @@ function EditSheet({ expense, onClose, onSaved, authToken }) {
 
   return (
     <div className="edit-sheet-overlay" onClick={onClose}>
-      <div className="edit-sheet" onClick={e => e.stopPropagation()}>
-        <div className="edit-sheet-handle-row"><div className="edit-sheet-handle" /></div>
+      <div className="edit-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="edit-sheet-handle-row">
+          <div className="edit-sheet-handle" />
+        </div>
         <div className="edit-sheet-header">
           <p className="edit-sheet-title">Edit Expense</p>
-          <button className="edit-sheet-close" onClick={onClose}>✕</button>
+          <button className="edit-sheet-close" onClick={onClose}>
+            ✕
+          </button>
         </div>
         <div className="edit-sheet-fields">
           <div className="edit-field-group">
             <p className="edit-field-label">Amount</p>
             <input
               className="edit-field-input"
-              type="number" min="1" step="1" inputMode="numeric"
+              type="number"
+              min="1"
+              step="1"
+              inputMode="numeric"
               placeholder="0"
               value={amt}
-              onChange={e => setAmt(e.target.value)}
+              onChange={(e) => setAmt(e.target.value)}
               autoFocus
             />
           </div>
@@ -658,12 +687,14 @@ function EditSheet({ expense, onClose, onSaved, authToken }) {
               type="text"
               placeholder="Coffee, lunch, transport…"
               value={note}
-              onChange={e => setNote(e.target.value)}
+              onChange={(e) => setNote(e.target.value)}
             />
           </div>
         </div>
         <div className="edit-sheet-actions">
-          <button className="edit-action-cancel" onClick={onClose}>Cancel</button>
+          <button className="edit-action-cancel" onClick={onClose}>
+            Cancel
+          </button>
           <button className="edit-action-save" onClick={save} disabled={saving}>
             {saving ? "Saving…" : "Save changes"}
           </button>
@@ -680,7 +711,11 @@ function DeleteSheet({ expense, code, onClose, onDeleted, authToken }) {
   async function confirm() {
     setDeleting(true);
     try {
-      await fetchJson(`/api/expenses/${expense.id || expense._id}`, { method: "DELETE" }, authToken);
+      await fetchJson(
+        `/api/expenses/${expense.id || expense._id}`,
+        { method: "DELETE" },
+        authToken,
+      );
       onDeleted();
     } catch (e) {
       console.error(e);
@@ -691,23 +726,35 @@ function DeleteSheet({ expense, code, onClose, onDeleted, authToken }) {
 
   return (
     <div className="edit-sheet-overlay" onClick={onClose}>
-      <div className="del-sheet" onClick={e => e.stopPropagation()}>
-        <div className="edit-sheet-handle-row"><div className="edit-sheet-handle" /></div>
+      <div className="del-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="edit-sheet-handle-row">
+          <div className="edit-sheet-handle" />
+        </div>
         <div className="del-sheet-body">
           <div className="del-icon-wrap">
-            <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+            </svg>
           </div>
           <p className="del-title">Delete expense?</p>
           <p className="del-desc">
-            <strong>{expense.note || "Unlabelled"}</strong> · {currency(expense.amount, code)}<br />
+            <strong>{expense.note || "Unlabelled"}</strong> ·{" "}
+            {currency(expense.amount, code)}
+            <br />
             This can't be undone.
           </p>
         </div>
         <div className="del-actions">
-          <button className="del-confirm-btn" onClick={confirm} disabled={deleting}>
+          <button
+            className="del-confirm-btn"
+            onClick={confirm}
+            disabled={deleting}
+          >
             {deleting ? "Deleting…" : "Yes, delete it"}
           </button>
-          <button className="del-cancel-btn" onClick={onClose}>Keep it</button>
+          <button className="del-cancel-btn" onClick={onClose}>
+            Keep it
+          </button>
         </div>
       </div>
     </div>
@@ -724,7 +771,9 @@ export default function HomePage() {
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [authToken] = useState(() =>
-    typeof window !== "undefined" ? window.sessionStorage.getItem(TOKEN_KEY) || "" : ""
+    typeof window !== "undefined"
+      ? window.sessionStorage.getItem(TOKEN_KEY) || ""
+      : "",
   );
 
   const loadData = useCallback(async () => {
@@ -759,7 +808,12 @@ export default function HomePage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: num, note: note.trim(), category: "general", date: getTodayKey() }),
+          body: JSON.stringify({
+            amount: num,
+            note: note.trim(),
+            category: "general",
+            date: getTodayKey(),
+          }),
         },
         authToken,
       );
@@ -778,8 +832,18 @@ export default function HomePage() {
   const expenses = dashboard?.expenses || [];
   const code = dashboard?.currencyCode || "INR";
   const pct = Math.min((spent / Math.max(dailyBudget, 1)) * 100, 100);
-  const tone = spent < dailyBudget ? "success" : spent === dailyBudget ? "warning" : "danger";
-  const pillLabel = spent < dailyBudget ? "On track" : spent === dailyBudget ? "Limit hit" : "Overspent";
+  const tone =
+    spent < dailyBudget
+      ? "success"
+      : spent === dailyBudget
+        ? "warning"
+        : "danger";
+  const pillLabel =
+    spent < dailyBudget
+      ? "On track"
+      : spent === dailyBudget
+        ? "Limit hit"
+        : "Overspent";
 
   return (
     <>
@@ -791,7 +855,10 @@ export default function HomePage() {
           expense={editTarget}
           authToken={authToken}
           onClose={() => setEditTarget(null)}
-          onSaved={() => { setEditTarget(null); loadData(); }}
+          onSaved={() => {
+            setEditTarget(null);
+            loadData();
+          }}
         />
       )}
       {deleteTarget && (
@@ -800,12 +867,17 @@ export default function HomePage() {
           code={code}
           authToken={authToken}
           onClose={() => setDeleteTarget(null)}
-          onDeleted={() => { setDeleteTarget(null); loadData(); }}
+          onDeleted={() => {
+            setDeleteTarget(null);
+            loadData();
+          }}
         />
       )}
 
       {errorMessage && (
-        <div className="error-banner" role="alert">{errorMessage}</div>
+        <div className="error-banner" role="alert">
+          {errorMessage}
+        </div>
       )}
 
       <div className="tab-panel fade-in">
@@ -820,13 +892,16 @@ export default function HomePage() {
                 <p className="hero-amount">{currency(spent, code)}</p>
               </div>
               <span className={`pill pill-${tone}`}>
-                <span className="pill-dot" />{pillLabel}
+                <span className="pill-dot" />
+                {pillLabel}
               </span>
             </div>
             <div className="hero-metrics">
               <div className="hero-metric">
                 <p className="hero-metric-lbl">Remaining</p>
-                <p className="hero-metric-val">{currency(Math.abs(remaining), code)}</p>
+                <p className="hero-metric-val">
+                  {currency(Math.abs(remaining), code)}
+                </p>
               </div>
               <div className="hero-metric">
                 <p className="hero-metric-lbl">Daily cap</p>
@@ -834,7 +909,10 @@ export default function HomePage() {
               </div>
             </div>
             <div className="progress-track">
-              <div className={`progress-fill progress-fill-${tone}`} style={{ width: `${pct}%` }} />
+              <div
+                className={`progress-fill progress-fill-${tone}`}
+                style={{ width: `${pct}%` }}
+              />
             </div>
           </div>
         </div>
@@ -848,10 +926,13 @@ export default function HomePage() {
                 <span className="add-amt-prefix">₹</span>
                 <input
                   className="add-input amt"
-                  type="number" min="1" step="1" inputMode="numeric"
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputMode="numeric"
                   placeholder="0"
                   value={amount}
-                  onChange={e => setAmount(e.target.value)}
+                  onChange={(e) => setAmount(e.target.value)}
                 />
               </div>
               <input
@@ -860,11 +941,17 @@ export default function HomePage() {
                 type="text"
                 placeholder="What was it for?"
                 value={note}
-                onChange={e => setNote(e.target.value)}
+                onChange={(e) => setNote(e.target.value)}
               />
             </div>
-            <button className="add-submit-btn" type="submit" disabled={isSyncing || !amount}>
-              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+            <button
+              className="add-submit-btn"
+              type="submit"
+              disabled={isSyncing || !amount}
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
               {isSyncing ? "Saving…" : "Add expense"}
             </button>
           </form>
@@ -875,7 +962,9 @@ export default function HomePage() {
           <div className="exp-section-header">
             <p className="exp-section-label">Today's log</p>
             {expenses.length > 0 && (
-              <span className="exp-section-count">{expenses.length} {expenses.length === 1 ? "item" : "items"}</span>
+              <span className="exp-section-count">
+                {expenses.length} {expenses.length === 1 ? "item" : "items"}
+              </span>
             )}
           </div>
 
@@ -883,7 +972,9 @@ export default function HomePage() {
             <div className="exp-hint">
               <span>Swipe left to edit or delete</span>
               <span className="exp-hint-arrow">
-                <span /><span /><span />
+                <span />
+                <span />
+                <span />
               </span>
             </div>
           )}
@@ -916,7 +1007,9 @@ export default function HomePage() {
 
       {/* FAB */}
       <button className="exp-fab" onClick={addExpense} disabled={isSyncing}>
-        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+        <svg viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
         {isSyncing ? "Saving…" : "Add Expense"}
       </button>
     </>

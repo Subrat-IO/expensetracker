@@ -214,6 +214,13 @@ const GLOBAL_STYLES = `
     display: flex;
     align-items: stretch;
     z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+  .swipe-wrapper.revealed .swipe-actions {
+    opacity: 1;
+    pointer-events: auto;
   }
   .swipe-btn {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
@@ -228,7 +235,8 @@ const GLOBAL_STYLES = `
   .swipe-row-inner {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: 14px 0;
-    background: transparent;
+    width: 100%;
+    background: var(--s1);
     position: relative; z-index: 2;
     transform: translateX(0);
     transition: transform 300ms cubic-bezier(0.22,1,0.36,1);
@@ -547,7 +555,7 @@ function SwipeableExpenseRow({ exp, code, onEdit, onDelete }) {
   }
 
   return (
-    <div className="swipe-wrapper">
+    <div className={`swipe-wrapper${swiped ? " revealed" : ""}`}>
       {/* Hidden actions revealed by swipe */}
       <div className="swipe-actions">
         <button className="swipe-btn swipe-btn-edit" onClick={handleEditClick}>
@@ -890,7 +898,7 @@ function HomeTab({
         <div className="hero-inner">
           <div className="hero-row">
             <div>
-              <p className="hero-eyebrow">Today's spend</p>
+              <p className="hero-eyebrow">Today&apos;s spend</p>
               <p className="hero-amount">{currency(spent, code)}</p>
             </div>
             <span className={`pill pill-${tone}`}>
@@ -1243,6 +1251,7 @@ function ProfileButton({ currentUser, profileImg, onClickUpload }) {
       title="Click to change profile picture"
     >
       {profileImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img src={profileImg} alt="Profile" className="topbar-profile-img" />
       ) : (
         <span className="topbar-profile-initials">{initials}</span>
@@ -1301,6 +1310,7 @@ function ProfileTab({
           title="Tap to change photo"
         >
           {profileImg ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={profileImg}
               alt="Profile"
