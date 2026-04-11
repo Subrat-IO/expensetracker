@@ -1259,7 +1259,15 @@ function ProfileButton({ currentUser, profileImg, onClickUpload }) {
     >
       {profileImg ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={profileImg} alt="Profile" className="topbar-profile-img" />
+        <img
+          src={profileImg}
+          alt="Profile"
+          className="topbar-profile-img"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = "/myprofile.png";
+          }}
+        />
       ) : (
         <span className="topbar-profile-initials">{initials}</span>
       )}
@@ -1321,6 +1329,10 @@ function ProfileTab({
             <img
               src={profileImg}
               alt="Profile"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/myprofile.png";
+              }}
               style={{
                 width: "100%",
                 height: "100%",
@@ -1520,10 +1532,12 @@ export default function AppShell() {
     const saved = window.localStorage.getItem(`profile_img_${currentUser.id}`);
     if (saved) {
       setProfileImg(buildAssetUrl(saved));
+    } else if (currentUser.profileImage) {
+      setProfileImg(buildAssetUrl(currentUser.profileImage));
     } else {
       setProfileImg("/myprofile.png");
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.profileImage]);
 
   const loadAppData = useCallback(async () => {
     setIsSyncing(true);
@@ -1565,6 +1579,9 @@ export default function AppShell() {
       .then((p) => {
         setAuthToken(tok);
         setCurrentUser(p.user || (usr ? JSON.parse(usr) : null));
+        if (p.user) {
+          window.sessionStorage.setItem(USER_KEY, JSON.stringify(p.user));
+        }
       })
       .catch(() => {
         window.sessionStorage.removeItem(TOKEN_KEY);
@@ -1753,11 +1770,34 @@ export default function AppShell() {
           if (data.imageUrl) {
             const resolvedImageUrl = buildAssetUrl(data.imageUrl);
             setProfileImg(resolvedImageUrl);
+            setCurrentUser((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    profileImage: data.imageUrl,
+                  }
+                : prev,
+            );
             if (currentUser?.id) {
               window.localStorage.setItem(
                 `profile_img_${currentUser.id}`,
                 resolvedImageUrl,
               );
+            }
+            const savedUser = window.sessionStorage.getItem(USER_KEY);
+            if (savedUser) {
+              try {
+                const parsedUser = JSON.parse(savedUser);
+                window.sessionStorage.setItem(
+                  USER_KEY,
+                  JSON.stringify({
+                    ...parsedUser,
+                    profileImage: data.imageUrl,
+                  }),
+                );
+              } catch (_error) {
+                // Ignore malformed session payload.
+              }
             }
           }
         }

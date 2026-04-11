@@ -1,10 +1,12 @@
-const CACHE_NAME = "discipline-tracker-v2";
+const CACHE_NAME = "discipline-tracker-v3";
 const APP_SHELL = [
   "/",
+  "/home",
   "/manifest.json",
   "/icon-192.svg",
   "/icon-512.svg",
   "/apple-touch-icon.svg",
+  "/myprofile.png",
 ];
 
 function isCacheableRequest(request) {

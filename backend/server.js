@@ -105,7 +105,9 @@ async function requireAuth(req, res, next) {
 
     const user = await usersCollection.findOne(
       { _id: new ObjectId(payload.sub) },
-      { projection: { username: 1, name: 1, sessionTokenId: 1 } },
+      {
+        projection: { username: 1, name: 1, sessionTokenId: 1, profileImage: 1 },
+      },
     );
 
     if (!user || !user.sessionTokenId || user.sessionTokenId !== payload.sid) {
@@ -120,6 +122,7 @@ async function requireAuth(req, res, next) {
         id: String(user._id),
         username: user.username,
         name: user.name,
+        profileImage: user.profileImage || "",
       },
       tokenId: payload.sid,
     };
@@ -353,7 +356,7 @@ app.post(
 
     const user = await usersCollection.findOne(
       { username },
-      { projection: { username: 1, password: 1, name: 1 } },
+      { projection: { username: 1, password: 1, name: 1, profileImage: 1 } },
     );
 
     if (!user || user.password !== password) {
@@ -373,6 +376,7 @@ app.post(
         id: String(user._id),
         username: user.username,
         name: user.name,
+        profileImage: user.profileImage || "",
       },
     });
   }),
@@ -540,6 +544,78 @@ app.post(
       category,
       date,
     });
+  }),
+);
+
+app.put(
+  "/api/expenses/:id",
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const amount = toNumber(req.body.amount);
+    const note = req.body.note || "";
+    const category = req.body.category || "general";
+    const date = req.body.date || todayDate();
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid expense id" });
+    }
+
+    if (!amount || !date) {
+      return res.status(400).json({ message: "amount and date are required" });
+    }
+
+    const existing = await expensesCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!existing) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
+
+    await expensesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          amount,
+          note,
+          category,
+          date,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    res.json(
+      mapExpense({
+        ...existing,
+        amount,
+        note,
+        category,
+        date,
+        updatedAt: new Date(),
+      }),
+    );
+  }),
+);
+
+app.delete(
+  "/api/expenses/:id",
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid expense id" });
+    }
+
+    const result = await expensesCollection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!result.deletedCount) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
+
+    res.json({ ok: true });
   }),
 );
 
