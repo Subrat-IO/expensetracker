@@ -183,6 +183,8 @@ function mapGymLog(doc) {
     date: normalizeDateValue(doc.date),
     completed: Boolean(doc.completed),
     sessionLabel: doc.sessionLabel || "6-7 AM Gym",
+    workoutType: doc.workoutType || "",
+    duration: toNumber(doc.duration || 0),
     notes: doc.notes || "",
     createdAt: doc.createdAt,
   };
@@ -743,6 +745,8 @@ app.post(
     const date = req.body.date || todayDate();
     const completed = Boolean(req.body.completed);
     const sessionLabel = req.body.sessionLabel || "6-7 AM Gym";
+    const workoutType = req.body.workoutType || "";
+    const duration = toNumber(req.body.duration || 0);
     const notes = req.body.notes || "";
 
     if (!date || typeof req.body.completed !== "boolean") {
@@ -757,6 +761,8 @@ app.post(
         $set: {
           completed,
           sessionLabel,
+          workoutType,
+          duration,
           notes,
           updatedAt: new Date(),
         },
@@ -771,6 +777,8 @@ app.post(
       date,
       completed,
       sessionLabel,
+      workoutType,
+      duration,
       notes,
     });
   }),
@@ -804,6 +812,91 @@ app.get(
       weeklyConsistency: Math.round((completedDays / 7) * 100),
       logs: normalized,
     });
+  }),
+);
+
+// ─── GET /api/expenses — list expenses by date range ─────────────────────────
+app.get(
+  "/api/expenses",
+  asyncHandler(async (req, res) => {
+    const { startDate, endDate, date } = req.query;
+    const filter = {};
+    if (date) {
+      filter.date = date;
+    } else {
+      if (startDate) filter.date = { $gte: startDate };
+      if (endDate) filter.date = { ...(filter.date || {}), $lte: endDate };
+    }
+    const expenses = await expensesCollection
+      .find(filter)
+      .sort({ date: -1, createdAt: -1 })
+      .toArray();
+    res.json(expenses.map(mapExpense));
+  }),
+);
+
+// ─── POST /api/expenses/bulk-delete — delete multiple expenses ────────────────
+app.post(
+  "/api/expenses/bulk-delete",
+  asyncHandler(async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ message: "ids array is required" });
+    }
+    const objectIds = ids
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    if (!objectIds.length) {
+      return res.status(400).json({ message: "No valid ids provided" });
+    }
+    const result = await expensesCollection.deleteMany({
+      _id: { $in: objectIds },
+    });
+    res.json({ ok: true, deletedCount: result.deletedCount });
+  }),
+);
+
+// ─── GET /api/stats/categories — category totals by date range ────────────────
+app.get(
+  "/api/stats/categories",
+  asyncHandler(async (req, res) => {
+    const { startDate, endDate } = req.query;
+    const match = {};
+    if (startDate) match.date = { $gte: startDate };
+    if (endDate) match.date = { ...(match.date || {}), $lte: endDate };
+    const rows = await expensesCollection
+      .aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: "$category",
+            total: { $sum: "$amount" },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { total: -1 } },
+      ])
+      .toArray();
+    res.json(
+      rows.map((row) => ({
+        category: row._id || "general",
+        total: toNumber(row.total),
+        count: row.count,
+      })),
+    );
+  }),
+);
+
+// ─── GET /api/gym/monthly — gym logs for a specific month ────────────────────
+app.get(
+  "/api/gym/monthly",
+  asyncHandler(async (req, res) => {
+    const month = (req.query.month || monthPrefix()).slice(0, 7);
+    const logs = await gymLogsCollection
+      .find({ date: { $regex: `^${month}` } })
+      .sort({ date: 1 })
+      .toArray();
+    res.json(logs.map(mapGymLog));
   }),
 );
 
